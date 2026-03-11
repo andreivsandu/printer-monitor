@@ -3,6 +3,7 @@ import os
 import csv
 import subprocess
 import json
+import logging
 from datetime import datetime
 from email.message import EmailMessage
 import smtplib
@@ -15,6 +16,16 @@ CSV_FILE = os.environ.get("PRINTER_MONITOR_CSV_FILE", f"{BASE_PATH}/printers.csv
 RUNTIME_DIR = os.environ.get("PRINTER_MONITOR_RUNTIME_DIR", f"{BASE_PATH}/runtime")
 HTML_FILE = os.environ.get("PRINTER_MONITOR_HTML_FILE", f"{RUNTIME_DIR}/printer_dashboard.html")
 STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{RUNTIME_DIR}/alert_state.json") 
+LOG_LEVEL = getattr(logging, os.environ.get("PRINTER_MONITOR_LOG_LEVEL", "INFO").upper(), logging.INFO)
+
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=LOG_LEVEL,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+
+logger = logging.getLogger("printer_monitor.dashboard")
+logger.setLevel(LOG_LEVEL)
 
 # === EMAIL ALERTS CONFIG ===
 SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "true" 
@@ -117,12 +128,14 @@ MODEL_OIDS = {}
 def snmp_get(ip, community, oid):
     value = run_snmp_command(ip, community, oid, "2c", "snmpget")
     if value is None:
+        logger.debug("Retrying snmpget for %s oid %s with SNMP v1", ip, oid)
         value = run_snmp_command(ip, community, oid, "1", "snmpget")
     return value
 
 def run_snmp_command(ip, community, oid, version, command_type):
+    cmd = [f"/usr/bin/{command_type}", f"-v{version}", "-c", community, ip, oid]
     try:
-        cmd = [f"/usr/bin/{command_type}", f"-v{version}", "-c", community, ip, oid]
+        logger.debug("Running %s against %s with SNMP v%s for oid %s", command_type, ip, version, oid)
         result = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=2).decode(errors='ignore')
         
         if command_type == "snmpget":
@@ -131,8 +144,15 @@ def run_snmp_command(ip, community, oid, version, command_type):
                 value = value.split("(")[-1].split(")")[0]
             return value
         return result
-    except:
-        return None
+    except subprocess.TimeoutExpired:
+        logger.debug("%s timed out for %s with SNMP v%s and oid %s", command_type, ip, version, oid)
+    except subprocess.CalledProcessError:
+        logger.debug("%s returned non-zero exit status for %s with SNMP v%s and oid %s", command_type, ip, version, oid)
+    except FileNotFoundError:
+        logger.exception("SNMP command %s is not available at expected path", command_type)
+    except Exception:
+        logger.exception("Unexpected error running %s for %s with SNMP v%s and oid %s", command_type, ip, version, oid)
+    return None
 
 def to_number(value):
     if value is None or value == "": return ""
@@ -166,6 +186,7 @@ def get_supply_percent(ip, community, model, supply_key):
 
 def send_critical_email(printer_name, ip_address, error_text):
     if not SEND_EMAILS:
+        logger.info("Email alerts disabled; skipping alert email for %s", printer_name)
         return
         
     msg = EmailMessage()
@@ -178,9 +199,9 @@ def send_critical_email(printer_name, ip_address, error_text):
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.send_message(msg)
-        print(f"📧 Alert email sent for {printer_name}")
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
+        logger.info("Alert email sent for %s", printer_name)
+    except Exception:
+        logger.exception("Failed to send alert email for %s", printer_name)
 
 def get_printer_alerts(ip, community):
     alert_oid = "1.3.6.1.2.1.43.18.1.1.8"
@@ -609,6 +630,7 @@ def main():
     printer_data = []
     ensure_parent_dir(STATE_FILE)
     ensure_parent_dir(HTML_FILE)
+    logger.info("Starting dashboard generation using CSV=%s STATE=%s HTML=%s", CSV_FILE, STATE_FILE, HTML_FILE)
     
     shopping_counts = {}
     for forced_model in FORCE_SHOPPING_LIST:
@@ -619,16 +641,22 @@ def main():
         try:
             with open(STATE_FILE, "r") as f:
                 alert_state = json.load(f)
-        except:
-            pass
+            logger.debug("Loaded %s existing alert-state entries from %s", len(alert_state), STATE_FILE)
+        except Exception:
+            logger.exception("Failed to load alert state from %s; continuing with empty state", STATE_FILE)
+    else:
+        logger.debug("No existing alert state file found at %s", STATE_FILE)
 
     current_broken_printers = []
 
     with open(CSV_FILE, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
+        rows = list(csv.DictReader(f))
+        logger.info("Loaded %s printer definitions from %s", len(rows), CSV_FILE)
+        logger.info("Starting printer polling loop for %s printers", len(rows))
+        for row in rows:
             ip, name, community = row["IP"], row["name"], row["community"]
             original_model = row.get("model", "Unknown Model")
+            logger.debug("Polling printer %s at %s (model=%s)", name, ip, original_model)
             
             shopping_model_name = SUPPLY_MAPPING.get(original_model, original_model)
 
@@ -667,8 +695,11 @@ def main():
             if alerts_data['is_critical']:
                 current_broken_printers.append(name) 
                 if name not in alert_state:
+                    logger.info("New critical alert detected for %s; sending notification", name)
                     send_critical_email(name, ip, alerts_data['text'])
-                    alert_state[name] = True         
+                    alert_state[name] = True
+                else:
+                    logger.debug("Critical alert for %s already recorded in alert state", name)
 
             waste_display = format_waste(waste_raw)
 
@@ -688,20 +719,37 @@ def main():
                 "alerts": alerts_data, 
                 "b": b, "c": c, "m": m, "y": y, "fuser": fuser, "waste": waste_display
             })
+            logger.debug(
+                "Completed polling for %s: online=%s state=%s critical=%s warning=%s",
+                name,
+                online,
+                state,
+                alerts_data['is_critical'],
+                alerts_data['is_warning'],
+            )
+        logger.info("Completed printer polling loop for %s printers", len(printer_data))
 
     printers_to_remove = [p for p in alert_state if p not in current_broken_printers]
     for p in printers_to_remove:
         del alert_state[p]
+    if printers_to_remove:
+        logger.info("Cleared %s resolved printer alerts from state", len(printers_to_remove))
         
     with open(STATE_FILE, "w") as f:
         json.dump(alert_state, f)
+    logger.debug("Wrote %s alert-state entries to %s", len(alert_state), STATE_FILE)
 
     printer_data.sort(key=lambda x: x['name'].lower())
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     generate_html(printer_data, shopping_counts, timestamp)
-    print(f"[{timestamp}] ✅ Dashboard generated successfully at: {HTML_FILE}")
+    logger.info(
+        "Dashboard generated successfully at %s with %s printers and %s active critical alerts",
+        HTML_FILE,
+        len(printer_data),
+        len(current_broken_printers),
+    )
 
 if __name__ == "__main__":
     main()

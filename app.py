@@ -1,12 +1,24 @@
 import os
 import threading
 import time
+import logging
 
 from flask import Flask, Response, jsonify, send_file
 
 from generate_dashboard import HTML_FILE, main as generate_dashboard
 
 app = Flask(__name__)
+
+LOG_LEVEL = getattr(logging, os.environ.get("PRINTER_MONITOR_LOG_LEVEL", "INFO").upper(), logging.INFO)
+
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=LOG_LEVEL,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+
+logger = logging.getLogger("printer_monitor.app")
+logger.setLevel(LOG_LEVEL)
 
 REFRESH_INTERVAL_SECONDS = int(os.environ.get("PRINTER_MONITOR_REFRESH_INTERVAL_SECONDS", "900"))
 last_refresh_error = None
@@ -18,19 +30,21 @@ refresh_thread_lock = threading.Lock()
 def refresh_dashboard():
     global last_refresh_error
     with refresh_lock:
-        print("[printer-monitor] Starting dashboard refresh...", flush=True)
+        logger.info("Starting dashboard refresh")
         try:
             generate_dashboard()
             last_refresh_error = None
-            print("[printer-monitor] Dashboard refresh completed.", flush=True)
+            logger.info("Dashboard refresh completed")
         except Exception as exc:
             last_refresh_error = str(exc)
-            print(f"[printer-monitor] Dashboard refresh failed: {exc}", flush=True)
+            logger.exception("Dashboard refresh failed")
 
 
 def background_refresh_loop():
+    logger.info("Background refresh loop started")
     while True:
         refresh_dashboard()
+        logger.debug("Sleeping for %s seconds before next dashboard refresh", REFRESH_INTERVAL_SECONDS)
         time.sleep(REFRESH_INTERVAL_SECONDS)
 
 
@@ -38,9 +52,11 @@ def ensure_refresh_thread_started():
     global refresh_thread
     with refresh_thread_lock:
         if refresh_thread is None or not refresh_thread.is_alive():
-            print("[printer-monitor] Starting background refresh thread.", flush=True)
+            logger.info("Starting background refresh thread")
             refresh_thread = threading.Thread(target=background_refresh_loop, daemon=True)
             refresh_thread.start()
+        else:
+            logger.debug("Background refresh thread already running")
 
 
 def render_startup_page(message, status_code):
@@ -83,7 +99,9 @@ def index():
     if not os.path.exists(HTML_FILE):
         message = last_refresh_error or 'Initial dashboard generation in progress'
         status_code = 503 if last_refresh_error else 202
+        logger.debug("Dashboard file not available yet; serving startup page with status %s", status_code)
         return render_startup_page(message, status_code)
+    logger.debug("Serving dashboard HTML from %s", HTML_FILE)
     return send_file(HTML_FILE)
 
 
@@ -103,8 +121,10 @@ def health():
     })
 
 
+logger.info("Printer monitor app configured with refresh interval %s seconds", REFRESH_INTERVAL_SECONDS)
 ensure_refresh_thread_started()
 
 
 if __name__ == '__main__':
+    logger.info("Starting Flask development server on 0.0.0.0:8000")
     app.run(host='0.0.0.0', port=8000)
