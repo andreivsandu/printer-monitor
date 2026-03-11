@@ -39,13 +39,12 @@ SUPPLY_MAPPING = {
     "HP Color LaserJet CM4540f": "HP Color LaserJet CM4540f (Konstantieva)",
     "HP M880z": "HP M880z (Valkrye)",
     "C7165": "C7165 (Orion)",
-    "imageFORCE C7165": "imageFORCE C7165 (Orion)",
+    "imageFORCE C7165": "C7165 (Orion)",
     "Xerox AltaLink C8145": "Xerox AltaLink C8145 (Mercury)"
 }
 
 FORCE_SHOPPING_LIST = [
     "HP 2400 (Exchequer)",
-    "imageFORCE C7165 (Orion)",
     "C7165 (Orion)",
     "HP M402dn (Labelist)"
 ]
@@ -85,7 +84,7 @@ PART_NUMBERS = {
     "HP M880z (Valkrye)": {
         "Black": "CF300A", "Cyan": "CF301A", "Magenta": "CF303A", "Yellow": "CF302A", "Fuser": "C1N54A", "Waste": "C1N58A"
     },
-    "imageFORCE C7165 (Orion)": {
+    "C7165 (Orion)": {
         "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow", "Fuser": "Fuser", "Waste": "Waste"
     },
     "Xerox AltaLink C8145 (Mercury)": {
@@ -188,7 +187,6 @@ def get_printer_alerts(ip, community):
         return {"text": "", "is_critical": False, "is_warning": False}
 
     ignore_list = ["ready", "sleep mode", "power save", "ok", "printing", "warming up", "sleep mode on"]
-    
     critical_keywords = ["jam", "replace", "dead", "depleted", "exhausted", "error", "service", "offline", "install", "paused"] 
     warning_keywords = ["low", "very low", "used supply", "open", "empty", "load"] 
 
@@ -215,8 +213,6 @@ def get_printer_alerts(ip, community):
     for text in valid_alerts_found:
         text_lower = text.lower()
         
-        # --- NEW: FALSE POSITIVE SANITIZER ---
-        # Hide phrases that contain trigger words but shouldn't trigger an alert
         safe_text = text_lower.replace("do not replace", "ignore_swap")
         safe_text = safe_text.replace("services are unaffected", "ops fine")
         safe_text = safe_text.replace("copy services", "copy ops")
@@ -250,70 +246,227 @@ def generate_html(printer_data, shopping_counts, timestamp):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="refresh" content="300">
-        <title>Printer Dashboard</title>
+        <title>Office Printer Dashboard</title>
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
-            .container { max-width: 1400px; margin: auto; }
-            h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-            h2 { color: #2980b9; margin-top: 40px; }
-            .timestamp { color: #7f8c8d; font-size: 0.9em; margin-bottom: 20px; font-style: italic; }
+            /* CSS Variables for Dark/Light Mode */
+            :root {
+                --bg-color: #f4f7f6;
+                --text-color: #333;
+                --table-bg: #fff;
+                --table-border: #eee;
+                --th-bg: #34495e;
+                --th-text: #fff;
+                --row-even: #f9fbfc;
+                --row-hover: #f1f1f1;
+                --link-color: #2980b9;
+                --link-hover: #1abc9c;
+                --shop-th: #2980b9;
+                --bar-bg: #e0e0e0;
+                --header-border: #3498db;
+                
+                --toner-black: #34495e;
+                --toner-cyan: #00bcd4;
+                --toner-magenta: #e91e63;
+                --toner-yellow: #f1c40f;
+                --toner-fuser: #95a5a6;
+            }
+            [data-theme="dark"] {
+                --bg-color: #121212;
+                --text-color: #e0e0e0;
+                --table-bg: #1e1e1e;
+                --table-border: #333;
+                --th-bg: #1f2b38;
+                --th-text: #e0e0e0;
+                --row-even: #252525;
+                --row-hover: #2c2c2c;
+                --link-color: #64b5f6;
+                --link-hover: #81c784;
+                --shop-th: #154360;
+                --bar-bg: #444;
+                --header-border: #64b5f6;
+                
+                --toner-black: #9aa7b1; 
+                --toner-cyan: #26c6da;
+                --toner-magenta: #ec407a;
+                --toner-yellow: #ffee58;
+                --toner-fuser: #7f8c8d;
+            }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+            .container { max-width: 1500px; margin: auto; }
+            .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--header-border); padding-bottom: 10px; margin-bottom: 20px; }
+            h1 { color: var(--header-border); margin: 0; }
+            h2 { color: var(--link-color); margin-top: 40px; }
+            .timestamp { color: #7f8c8d; font-size: 0.9em; font-style: italic; }
             
-            table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-            th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
-            th { background-color: #34495e; color: #fff; text-transform: uppercase; font-size: 0.85em; letter-spacing: 0.5px; }
-            tr:nth-child(even) { background-color: #f9fbfc; }
-            tr:hover { background-color: #f1f1f1; }
+            table { width: 100%; border-collapse: collapse; background: var(--table-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+            th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--table-border); }
+            th { background-color: var(--th-bg); color: var(--th-text); text-transform: uppercase; font-size: 0.85em; letter-spacing: 0.5px; cursor: pointer; user-select: none; transition: 0.2s; }
+            th:hover { background-color: var(--link-hover); color: #fff; }
+            tr:nth-child(even) { background-color: var(--row-even); }
+            tr:hover { background-color: var(--row-hover); }
             
-            a { color: #2980b9; text-decoration: none; }
-            a:hover { text-decoration: underline; color: #1abc9c; }
+            a { color: var(--link-color); text-decoration: none; font-weight: bold; }
+            a:hover { text-decoration: underline; color: var(--link-hover); }
 
             .offline { color: #e74c3c; font-weight: bold; }
             .online { color: #2ecc71; font-weight: bold; }
-            .alert { color: #e74c3c; font-weight: bold; background: #ffeaea; padding: 2px 6px; border-radius: 4px; border: 1px solid #e74c3c; }
-            .shopping-table th { background-color: #2980b9; }
+            .shopping-table th { background-color: var(--shop-th); }
             
-            .alert-critical {
-                background-color: #ffcccc; 
-                color: black;
-                font-weight: 500;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-            .alert-warning {
-                background-color: #ffe0b2; 
-                color: black;
-                font-weight: 500;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-            .parts-list {
-                color: #2980b9;
-                font-weight: bold;
-                font-size: 0.9em;
-            }
+            .alert-critical { background-color: #ffcccc; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
+            .alert-warning { background-color: #ffe0b2; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
+            
+            /* Theme Toggle Button */
+            .theme-toggle { background: var(--th-bg); color: var(--th-text); border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+            .theme-toggle:hover { background: var(--link-hover); color: #fff;}
+            
+            /* Progress Bars */
+            .progress-container { width: 100%; min-width: 60px; background-color: var(--bar-bg); border-radius: 4px; position: relative; height: 22px; display: flex; align-items: center; overflow: hidden; border: 1px solid rgba(0,0,0,0.1);}
+            .progress-bar { height: 100%; transition: width 0.5s ease; }
+            .progress-text { position: absolute; width: 100%; text-align: center; font-size: 0.85em; font-weight: 700; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9); pointer-events: none;}
         </style>
+        
+        <script>
+            // --- SMART EMAIL SIGNATURE LOGIC ---
+            function resetName() {
+                localStorage.removeItem('orderName');
+                alert("Signature name has been reset! You will be prompted for your name the next time you click to order.");
+            }
+
+            function sendOrderEmail(vendor, printerName, serial) {
+                let userName = localStorage.getItem('orderName');
+                if (!userName) {
+                    userName = prompt("First time setup: What is your name? (This will be used for the email signature)");
+                    if (userName && userName.trim() !== "") {
+                        localStorage.setItem('orderName', userName.trim());
+                    } else {
+                        userName = "IT Support"; 
+                    }
+                }
+
+                let subject = "Toner Order - " + serial;
+                let printerDesc = printerName === 'Mercury' ? serial : "serial number " + serial;
+                
+                let fullMessage = `Dear sir/madam,
+
+Our printer (${printerDesc}) has run out of toner. We need a full set of colors and two blacks.
+
+--
+${userName}
+IT Support Team
+T: (514) 861-4367
+
+GOLDWATER DROIT
+3500 ouest boul. de Maisonneuve Blvd. West
+Suite 2310, Office Tower 2
+Westmount, QC H3Z 3C1`;
+
+                let fullBody = encodeURIComponent(fullMessage);
+                let encodedSubject = encodeURIComponent(subject);
+                let emailAddress = vendor === 'canon' ? 'canonsupplies@canada.canon.com' : 'cmorrison@printersplus.net';
+
+                window.location.href = "mailto:" + emailAddress + "?subject=" + encodedSubject + "&body=" + fullBody;
+            }
+
+            // Dark Mode Logic
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            function toggleDark() {
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+                localStorage.setItem('theme', isDark ? 'light' : 'dark');
+            }
+
+            // Smooth Background Refresh
+            function startAutoRefresh() {
+                setInterval(async () => {
+                    try {
+                        const response = await fetch(window.location.href);
+                        const html = await response.text();
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        
+                        document.getElementById('live-content').innerHTML = doc.getElementById('live-content').innerHTML;
+                    } catch (e) { console.error("Auto-refresh failed", e); }
+                }, 300000); 
+            }
+
+            // Table Sorting Logic
+            function sortTable(tableId, colIndex) {
+                var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+                table = document.getElementById(tableId);
+                switching = true;
+                dir = "asc"; 
+                while (switching) {
+                    switching = false;
+                    rows = table.rows;
+                    for (i = 1; i < (rows.length - 1); i++) {
+                        shouldSwitch = false;
+                        x = rows[i].getElementsByTagName("TD")[colIndex];
+                        y = rows[i + 1].getElementsByTagName("TD")[colIndex];
+                        
+                        let valX = x.innerText || x.textContent;
+                        let valY = y.innerText || y.textContent;
+                        
+                        let numX = parseFloat(valX.replace(/[^0-9.-]/g, ''));
+                        let numY = parseFloat(valY.replace(/[^0-9.-]/g, ''));
+                        
+                        if (!isNaN(numX) && !isNaN(numY) && valX.includes("%")) {
+                            valX = numX; valY = numY;
+                        } else {
+                            valX = valX.toLowerCase(); valY = valY.toLowerCase();
+                        }
+
+                        if (dir == "asc") {
+                            if (valX > valY) { shouldSwitch = true; break; }
+                        } else if (dir == "desc") {
+                            if (valX < valY) { shouldSwitch = true; break; }
+                        }
+                    }
+                    if (shouldSwitch) {
+                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                        switching = true;
+                        switchcount ++;      
+                    } else {
+                        if (switchcount == 0 && dir == "asc") {
+                            dir = "desc";
+                            switching = true;
+                        }
+                    }
+                }
+            }
+
+            window.onload = startAutoRefresh;
+        </script>
     </head>
     <body>
         <div class="container">
-            <h1>🖨️ Office Printer Dashboard</h1>
+            <div class="header-bar">
+                <h1>🖨️ Office Printer Dashboard</h1>
+                <div>
+                    <button class="theme-toggle" onclick="resetName()" style="margin-right: 10px;">👤 Reset Signature Name</button>
+                    <button class="theme-toggle" onclick="toggleDark()">🌙 / ☀️ Toggle Theme</button>
+                </div>
+            </div>
     """
     
-    html += f'        <div class="timestamp">Last Updated: {timestamp}</div>\n'
-    
-    html += """
-            <h2>🛒 Shopping List</h2>
-            <table class="shopping-table">
-                <tr>
-                    <th>Model / Group</th>
-                    <th>Black Qty</th>
-                    <th>Cyan Qty</th>
-                    <th>Magenta Qty</th>
-                    <th>Yellow Qty</th>
-                    <th>Fuser Qty</th>
-                    <th>Waste Qty</th>
-                    <th>Parts to Order</th>
-                </tr>
+    html += f"""
+            <div id="live-content">
+                <div class="timestamp">Last Updated: {timestamp}</div>
+                
+                <h2>🛒 Shopping List</h2>
+                <table class="shopping-table" id="shopTable">
+                    <tr>
+                        <th onclick="sortTable('shopTable', 0)">Model / Group ↕</th>
+                        <th onclick="sortTable('shopTable', 1)">Black Qty ↕</th>
+                        <th onclick="sortTable('shopTable', 2)">Cyan Qty ↕</th>
+                        <th onclick="sortTable('shopTable', 3)">Magenta Qty ↕</th>
+                        <th onclick="sortTable('shopTable', 4)">Yellow Qty ↕</th>
+                        <th onclick="sortTable('shopTable', 5)">Fuser Qty ↕</th>
+                        <th onclick="sortTable('shopTable', 6)">Waste Qty ↕</th>
+                        <th>Parts to Order</th>
+                        <th>Order Here</th>
+                    </tr>
     """
 
     sorted_models = sorted(shopping_counts.keys(), key=lambda x: x.lower())
@@ -331,53 +484,75 @@ def generate_html(printer_data, shopping_counts, timestamp):
             
             parts_str = "<br>".join(parts_to_order) if parts_to_order else "None needed yet"
             
+            # Smart Order Links
+            order_link = ""
+            if "Galactica" in model:
+                order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
+            elif "Orion" in model:
+                order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Orion', '3TQ0 1854'); return false;\">📧 Email Canon</a>"
+            elif "Mercury" in model:
+                order_link = f"<a href='#' onclick=\"sendOrderEmail('printersplus', 'Mercury', 'Xerox AltaLink C8145'); return false;\">📧 Email PrintersPlus</a>"
+            else:
+                order_link = "<a href='https://www.printersplus.net' target='_blank'>🌐 printersplus.net</a>"
+            
             html += f"""
-                <tr>
-                    <td><strong>{model}</strong></td>
-                    <td>{counts['Black']}</td>
-                    <td>{counts['Cyan']}</td>
-                    <td>{counts['Magenta']}</td>
-                    <td>{counts['Yellow']}</td>
-                    <td>{counts['Fuser']}</td>
-                    <td>{counts['Waste']}</td>
-                    <td class="parts-list">{parts_str}</td>
-                </tr>
+                    <tr>
+                        <td><strong>{model}</strong></td>
+                        <td>{counts['Black']}</td>
+                        <td>{counts['Cyan']}</td>
+                        <td>{counts['Magenta']}</td>
+                        <td>{counts['Yellow']}</td>
+                        <td>{counts['Fuser']}</td>
+                        <td>{counts['Waste']}</td>
+                        <td>{parts_str}</td>
+                        <td>{order_link}</td>
+                    </tr>
             """
 
     html += """
-            </table>
-            
-            <h2>📊 Live Printer Status</h2>
-            <table>
-                <tr>
-                    <th>Name</th>
-                    <th>IP Address</th>
-                    <th>Model</th>
-                    <th>Status</th>
-                    <th>Current Alerts</th>
-                    <th>Black</th>
-                    <th>Cyan</th>
-                    <th>Magenta</th>
-                    <th>Yellow</th>
-                    <th>Fuser</th>
-                    <th>Waste</th>
-                </tr>
+                </table>
+                
+                <h2>📊 Live Printer Status</h2>
+                <table id="statusTable">
+                    <tr>
+                        <th onclick="sortTable('statusTable', 0)">Name ↕</th>
+                        <th onclick="sortTable('statusTable', 1)">IP Address ↕</th>
+                        <th onclick="sortTable('statusTable', 2)">Model ↕</th>
+                        <th onclick="sortTable('statusTable', 3)">Status ↕</th>
+                        <th onclick="sortTable('statusTable', 4)">Current Alerts ↕</th>
+                        <th onclick="sortTable('statusTable', 5)">Black ↕</th>
+                        <th onclick="sortTable('statusTable', 6)">Cyan ↕</th>
+                        <th onclick="sortTable('statusTable', 7)">Magenta ↕</th>
+                        <th onclick="sortTable('statusTable', 8)">Yellow ↕</th>
+                        <th onclick="sortTable('statusTable', 9)">Fuser ↕</th>
+                        <th onclick="sortTable('statusTable', 10)">Waste ↕</th>
+                    </tr>
     """
 
-    def format_supply(val, is_waste=False):
+    def format_supply(val, is_waste=False, color_type="black"):
         if val == "" or val is None: return "-"
         if val in ["OK", "?"]: return val
         if isinstance(val, int):
+            
+            bar_color = "var(--toner-fuser)"
+            if color_type == "black": bar_color = "var(--toner-black)"
+            elif color_type == "cyan": bar_color = "var(--toner-cyan)"
+            elif color_type == "magenta": bar_color = "var(--toner-magenta)"
+            elif color_type == "yellow": bar_color = "var(--toner-yellow)"
+            
+            actual_val = 0 if val == -2 else val
+            
             if is_waste:
-                if val >= WASTE_FULL_THRESHOLD:
-                    return f"<span class='alert'>{val}%</span>"
+                if actual_val >= WASTE_FULL_THRESHOLD:
+                    bar_color = "#e74c3c" 
                 else:
                     return "OK"
-            else:
-                if val <= TONER_LOW_THRESHOLD or val == -2:
-                    display = "ERR" if val == -2 else f"{val}%"
-                    return f"<span class='alert'>{display}</span>"
-                return f"{val}%"
+            
+            display = f"{actual_val}%"
+            width_percent = actual_val if actual_val >= 0 else 0
+                
+            return f"<div class='progress-container'><div class='progress-bar' style='width: {width_percent}%; background-color: {bar_color};'></div><span class='progress-text'>{display}</span></div>"
+            
         return val
 
     for p in printer_data:
@@ -395,24 +570,24 @@ def generate_html(printer_data, shopping_counts, timestamp):
                 alerts_td_class_attr = "class='alert-warning'"
         
         html += f"""
-                <tr>
-                    <td><strong><a href="http://{p['ip']}" target="_blank">{p['name']}</a></strong></td>
-                    <td>{p['ip']}</td>
-                    <td>{p['model']}</td>
-                    <td class="{status_class}">{p['state']}</td>
-                    <td {alerts_td_class_attr}>{alerts_td_content}</td>
-                    <td>{format_supply(p['b'])}</td>
-                    <td>{format_supply(p['c'])}</td>
-                    <td>{format_supply(p['m'])}</td>
-                    <td>{format_supply(p['y'])}</td>
-                    <td>{format_supply(p['fuser'])}</td>
-                    <td>{format_supply(p['waste'], is_waste=True)}</td>
-                </tr>
+                    <tr>
+                        <td><strong><a href="http://{p['ip']}" target="_blank">{p['name']}</a></strong></td>
+                        <td>{p['ip']}</td>
+                        <td>{p['model']}</td>
+                        <td class="{status_class}">{p['state']}</td>
+                        <td><span {alerts_td_class_attr}>{alerts_td_content}</span></td>
+                        <td>{format_supply(p['b'], color_type='black')}</td>
+                        <td>{format_supply(p['c'], color_type='cyan')}</td>
+                        <td>{format_supply(p['m'], color_type='magenta')}</td>
+                        <td>{format_supply(p['y'], color_type='yellow')}</td>
+                        <td>{format_supply(p['fuser'], color_type='fuser')}</td>
+                        <td>{format_supply(p['waste'], is_waste=True, color_type='waste')}</td>
+                    </tr>
         """
 
     html += """
-            </table>
-        </div>
+                </table>
+            </div> </div>
     </body>
     </html>
     """
@@ -458,19 +633,34 @@ def main():
             
             alerts_data = get_printer_alerts(ip, community)
 
-            if alerts_data['is_critical']:
-                current_broken_printers.append(name) 
-                if name not in alert_state:          
-                    send_critical_email(name, ip, alerts_data['text'])
-                    alert_state[name] = True         
-
+            # --- FETCH ALL SUPPLIES BEFORE CHECKING FOR CRITICAL ALERTS ---
             b = get_supply_percent(ip, community, original_model, "black")
             c = get_supply_percent(ip, community, original_model, "cyan")
             m = get_supply_percent(ip, community, original_model, "magenta")
             y = get_supply_percent(ip, community, original_model, "yellow")
             fuser = get_supply_percent(ip, community, original_model, "fuser")
             waste_raw = get_supply_percent(ip, community, original_model, "waste")
+
+            # --- THE FIX: Failsafe now flags both 0 AND -2 (Error) ---
+            failsafe_errors = []
+            for color_name, val in [("Black Toner", b), ("Cyan Toner", c), ("Magenta Toner", m), ("Yellow Toner", y), ("Fuser", fuser)]:
+                if isinstance(val, int) and (val == 0 or val == -2):
+                    failsafe_errors.append(f"{color_name} is empty (0%)")
             
+            # --- OVERRIDE DASHBOARD ALERTS WITH FAILSAFE ---
+            if failsafe_errors:
+                alerts_data['is_critical'] = True
+                if alerts_data['text']:
+                    alerts_data['text'] = alerts_data['text'] + " | " + " | ".join(failsafe_errors)
+                else:
+                    alerts_data['text'] = " | ".join(failsafe_errors)
+
+            if alerts_data['is_critical']:
+                current_broken_printers.append(name) 
+                if name not in alert_state:
+                    send_critical_email(name, ip, alerts_data['text'])
+                    alert_state[name] = True         
+
             waste_display = format_waste(waste_raw)
 
             for color, val in [("Black", b), ("Cyan", c), ("Magenta", m), ("Yellow", y)]:
