@@ -82,6 +82,34 @@ In this mode:
 - `./printers.csv` on the host is bind-mounted read-only to `/app/printers.csv`, so you can update printer inventory data without rebuilding the image
 - `./runtime` on the host is bind-mounted to `/app/runtime` so generated dashboard output and alert state persist outside the container
 
+## Why you see the `werkzeug` warning
+Because your **base** [docker-compose.yml](docker-compose.yml) runs:
+
+```yaml
+command: python app.py
+```
+
+and [app.py](app.py) contains:
+
+```python
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
+```
+
+That starts Flask’s built-in development server, which is powered by `werkzeug`, and it logs:
+
+- **"This is a development server. Do not use it in a production deployment."**
+
+That is expected for the **dev/local** Compose path.
+
+Your **production override** uses:
+
+```yaml
+command: gunicorn --bind 0.0.0.0:8000 app:app
+```
+
+So if you run with both Compose files, you should **not** get that development-server warning.
+
 ## Environment variables
 
 Optional environment variables include:
@@ -103,3 +131,5 @@ Optional environment variables include:
 - `printers.csv` is committed source data and is intentionally provided from the host in production instead of being baked into the image.
 - Generated files are intentionally not committed; the app creates `runtime/alert_state.json` and `runtime/printer_dashboard.html` automatically.
 - A host directory bind mount is used for runtime state because binding individual files that do not yet exist on the host is fragile; if you want to be explicit on first deploy, run `mkdir -p runtime` before starting the production stack.
+
+
