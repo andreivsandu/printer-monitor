@@ -34,6 +34,7 @@ In this mode:
 - The project root is bind-mounted into `/app` for live code edits
 - The container serves the dashboard from `/`
 - Generated artifacts are written under `/app/runtime`
+- Dashboard and container log timestamps default to `America/Toronto`
 - The dashboard is refreshed every 15 minutes by default
 
 ## Local dev un-dockerized
@@ -115,6 +116,7 @@ So if you run with both Compose files, you should **not** get that development-s
 Optional environment variables include:
 
 - `PRINTER_MONITOR_REFRESH_INTERVAL_SECONDS`
+- `PRINTER_MONITOR_TIMEZONE`
 - `PRINTER_MONITOR_SEND_EMAILS`
 - `PRINTER_MONITOR_SMTP_SERVER`
 - `PRINTER_MONITOR_SMTP_PORT`
@@ -123,6 +125,7 @@ Optional environment variables include:
 - `PRINTER_MONITOR_PORT`
 - `PRINTER_MONITOR_SERVER_NAME`
 - `FRONTEND_PROXY_NETWORK`
+- `TZ`
 
 ## Notes
 
@@ -131,5 +134,7 @@ Optional environment variables include:
 - `printers.csv` is committed source data and is intentionally provided from the host in production instead of being baked into the image.
 - Generated files are intentionally not committed; the app creates `runtime/alert_state.json` and `runtime/printer_dashboard.html` automatically.
 - A host directory bind mount is used for runtime state because binding individual files that do not yet exist on the host is fragile; if you want to be explicit on first deploy, run `mkdir -p runtime` before starting the production stack.
+- `PRINTER_MONITOR_TIMEZONE` controls application display timestamps and defaults to `America/Toronto`; invalid values fall back to that default.
+- `TZ` controls the container process timezone and therefore log timestamps; by default it is also set to `America/Toronto` so the dashboard and logs stay aligned.
 
 

@@ -4,9 +4,11 @@ import csv
 import subprocess
 import json
 import logging
+import time
 from datetime import datetime
 from email.message import EmailMessage
 import smtplib
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # =========================
 # CONFIGURATION
@@ -16,6 +18,8 @@ CSV_FILE = os.environ.get("PRINTER_MONITOR_CSV_FILE", f"{BASE_PATH}/printers.csv
 RUNTIME_DIR = os.environ.get("PRINTER_MONITOR_RUNTIME_DIR", f"{BASE_PATH}/runtime")
 HTML_FILE = os.environ.get("PRINTER_MONITOR_HTML_FILE", f"{RUNTIME_DIR}/printer_dashboard.html")
 STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{RUNTIME_DIR}/alert_state.json") 
+DEFAULT_TIMEZONE_NAME = "America/Toronto"
+CONFIGURED_TIMEZONE_NAME = os.environ.get("PRINTER_MONITOR_TIMEZONE", os.environ.get("TZ", DEFAULT_TIMEZONE_NAME))
 LOG_LEVEL = getattr(logging, os.environ.get("PRINTER_MONITOR_LOG_LEVEL", "INFO").upper(), logging.INFO)
 
 if not logging.getLogger().handlers:
@@ -26,6 +30,22 @@ if not logging.getLogger().handlers:
 
 logger = logging.getLogger("printer_monitor.dashboard")
 logger.setLevel(LOG_LEVEL)
+
+try:
+    APP_TIMEZONE = ZoneInfo(CONFIGURED_TIMEZONE_NAME)
+    APP_TIMEZONE_NAME = CONFIGURED_TIMEZONE_NAME
+except ZoneInfoNotFoundError:
+    APP_TIMEZONE = ZoneInfo(DEFAULT_TIMEZONE_NAME)
+    APP_TIMEZONE_NAME = DEFAULT_TIMEZONE_NAME
+
+if CONFIGURED_TIMEZONE_NAME != APP_TIMEZONE_NAME:
+    logger.warning("Invalid timezone %s; falling back to %s", CONFIGURED_TIMEZONE_NAME, APP_TIMEZONE_NAME)
+
+os.environ["TZ"] = APP_TIMEZONE_NAME
+if hasattr(time, "tzset"):
+    time.tzset()
+
+logger.info("Using printer monitor timezone %s", APP_TIMEZONE_NAME)
 
 # === EMAIL ALERTS CONFIG ===
 SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "true" 
@@ -60,6 +80,15 @@ FORCE_SHOPPING_LIST = [
     "C7165 (Orion)",
     "HP M402dn (Labelist)"
 ]
+
+
+def get_local_now():
+    return datetime.now(APP_TIMEZONE)
+
+
+def format_display_timestamp(value):
+    return value.strftime("%Y-%m-%d %H:%M:%S %Z")
+
 
 def ensure_parent_dir(path):
     directory = os.path.dirname(path)
@@ -741,7 +770,7 @@ def main():
 
     printer_data.sort(key=lambda x: x['name'].lower())
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = format_display_timestamp(get_local_now())
     
     generate_html(printer_data, shopping_counts, timestamp)
     logger.info(
