@@ -1,0 +1,861 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="refresh" content="300">
+        <title>Printer Dashboard</title>
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+            .container { max-width: 1400px; margin: auto; }
+            h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+            h2 { color: #2980b9; margin-top: 40px; }
+            .timestamp { color: #7f8c8d; font-size: 0.9em; margin-bottom: 20px; font-style: italic; }
+            
+            table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+            th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+            th { background-color: #34495e; color: #fff; text-transform: uppercase; font-size: 0.85em; letter-spacing: 0.5px; }
+            tr:nth-child(even) { background-color: #f9fbfc; }
+            tr:hover { background-color: #f1f1f1; }
+            
+            a { color: #2980b9; text-decoration: none; }
+            a:hover { text-decoration: underline; color: #1abc9c; }
+
+            .offline { color: #e74c3c; font-weight: bold; }
+            .online { color: #2ecc71; font-weight: bold; }
+            .alert { color: #e74c3c; font-weight: bold; background: #ffeaea; padding: 2px 6px; border-radius: 4px; border: 1px solid #e74c3c; }
+            .shopping-table th { background-color: #2980b9; }
+            
+            .alert-critical {
+                background-color: #ffcccc; 
+                color: black;
+                font-weight: 500;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }
+            .alert-warning {
+                background-color: #ffe0b2; 
+                color: black;
+                font-weight: 500;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }
+            .parts-list {
+                color: #2980b9;
+                font-weight: bold;
+                font-size: 0.9em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🖨️ Office Printer Dashboard</h1>
+            <div class="timestamp">Last Updated: 2026-03-09 15:44:11</div>
+
+            <h2>🛒 Shopping List</h2>
+            <table class="shopping-table">
+                <tr>
+                    <th>Model / Group</th>
+                    <th>Black Qty</th>
+                    <th>Cyan Qty</th>
+                    <th>Magenta Qty</th>
+                    <th>Yellow Qty</th>
+                    <th>Fuser Qty</th>
+                    <th>Waste Qty</th>
+                    <th>Parts to Order</th>
+                </tr>
+    
+                <tr>
+                    <td><strong>C7165 (Orion)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td class="parts-list">None needed yet</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>Canon C5860 (Galactica)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td class="parts-list">Yellow: Yellow</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP 2400 (Exchequer)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td class="parts-list">None needed yet</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP Color LaserJet 4525 (Dr. Zaius)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td class="parts-list">Yellow: CE262A<br>Fuser: CE246A<br>Waste: CE265A</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP Color LaserJet 4700 (RainbowAlliance)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td class="parts-list">Fuser: Q7502A<br>Waste: N/A</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP Color LaserJet CM4540f (Konstantieva)</strong></td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td class="parts-list">Black: CE264X<br>Magenta: CE263A<br>Waste: CE265A</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP Color LaserJet M551</strong></td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td class="parts-list">Cyan: CE401AC<br>Magenta: CE403AC<br>Yellow: CE402AC</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP M402dn (Labelist)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td class="parts-list">None needed yet</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP M553</strong></td>
+                    <td>4</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>4</td>
+                    <td>0</td>
+                    <td class="parts-list">Black: CF360XC<br>Cyan: CF361XC<br>Magenta: CF363XC<br>Yellow: CF362XC<br>Fuser: TBD</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP M554 / M555 Series</strong></td>
+                    <td>4</td>
+                    <td>2</td>
+                    <td>3</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td class="parts-list">Black: W2120X<br>Cyan: W2121X<br>Magenta: W2123X<br>Yellow: W2122X<br>Fuser: B5L35A</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP M651</strong></td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td>2</td>
+                    <td class="parts-list">Cyan: CF331AC<br>Magenta: CF333AC<br>Yellow: CF332AC<br>Waste: TBD</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>HP M880z (Valkrye)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td class="parts-list">Waste: C1N58A</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>imageFORCE C7165 (Orion)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td class="parts-list">None needed yet</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>Xerox AltaLink C8145 (Mercury)</strong></td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td class="parts-list">Waste: 008R13325</td>
+                </tr>
+            
+            </table>
+            
+            <h2>📊 Live Printer Status</h2>
+            <table>
+                <tr>
+                    <th>Name</th>
+                    <th>IP Address</th>
+                    <th>Model</th>
+                    <th>Status</th>
+                    <th>Current Alerts</th>
+                    <th>Black</th>
+                    <th>Cyan</th>
+                    <th>Magenta</th>
+                    <th>Yellow</th>
+                    <th>Fuser</th>
+                    <th>Waste</th>
+                </tr>
+    
+                <tr>
+                    <td><strong><a href="http://10.20.0.216" target="_blank">Alien</a></strong></td>
+                    <td>10.20.0.216</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Fuser Kit very low</td>
+                    <td>97%</td>
+                    <td>72%</td>
+                    <td>10%</td>
+                    <td>69%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.221" target="_blank">Avatar</a></strong></td>
+                    <td>10.20.0.221</td>
+                    <td>HP Color LaserJet M551</td>
+                    <td class="offline">OFFLINE</td>
+                    <td >-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.237" target="_blank">Bulbasaur</a></strong></td>
+                    <td>10.20.0.237</td>
+                    <td>HP M553</td>
+                    <td class="offline">OFFLINE</td>
+                    <td >-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.241" target="_blank">Charizard</a></strong></td>
+                    <td>10.20.0.241</td>
+                    <td>HP M555</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Black Cartridge very low</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>78%</td>
+                    <td>82%</td>
+                    <td>79%</td>
+                    <td>56%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.236" target="_blank">Charmander</a></strong></td>
+                    <td>10.20.0.236</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Fuser Kit low</td>
+                    <td>73%</td>
+                    <td>93%</td>
+                    <td>92%</td>
+                    <td>92%</td>
+                    <td><span class='alert'>2%</span></td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.233" target="_blank">Charybdis</a></strong></td>
+                    <td>10.20.0.233</td>
+                    <td>HP M651</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Yellow Cartridge low</td>
+                    <td>10%</td>
+                    <td>86%</td>
+                    <td>49%</td>
+                    <td><span class='alert'>1%</span></td>
+                    <td>49%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.250" target="_blank">Donatello</a></strong></td>
+                    <td>10.20.0.250</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Fuser Kit very low | Used supply in use</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>56%</td>
+                    <td>67%</td>
+                    <td>61%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.228" target="_blank">Dr. Who</a></strong></td>
+                    <td>10.20.0.228</td>
+                    <td>HP Color LaserJet 4525</td>
+                    <td class="offline">OFFLINE</td>
+                    <td >-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.227" target="_blank">Dr. Zaius</a></strong></td>
+                    <td>10.20.0.227</td>
+                    <td>HP Color LaserJet 4525</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>USED SUPPLY IN USE | SUPPLIES VERY LOW | FUSER KIT VERY LOW | TRANSFER KIT VERY LOW | MAGENTA CARTRIDGE LOW</td>
+                    <td>40%</td>
+                    <td>40%</td>
+                    <td>9%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>0%</span></td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.253" target="_blank">Eevee</a></strong></td>
+                    <td>10.20.0.253</td>
+                    <td>HP M553</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>68%</td>
+                    <td>21%</td>
+                    <td>17%</td>
+                    <td>33%</td>
+                    <td>8%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.223" target="_blank">Excalibur</a></strong></td>
+                    <td>10.20.0.223</td>
+                    <td>HP Color LaserJet M551</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>34%</td>
+                    <td>69%</td>
+                    <td>19%</td>
+                    <td>49%</td>
+                    <td>19%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.229" target="_blank">Exchequer</a></strong></td>
+                    <td>10.20.0.229</td>
+                    <td>HP 2400</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>TRAY 2 OPEN OR EMPTY</td>
+                    <td>93%</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.249" target="_blank">Galactica</a></strong></td>
+                    <td>10.20.0.249</td>
+                    <td>Canon C5860</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>toner is low (cyan). | toner is low (magenta). | toner is low (yellow). | paper is out (letter).</td>
+                    <td>56%</td>
+                    <td>25%</td>
+                    <td>28%</td>
+                    <td><span class='alert'>1%</span></td>
+                    <td>91%</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.213" target="_blank">Gengar</a></strong></td>
+                    <td>10.20.0.213</td>
+                    <td>HP M554</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Black Cartridge very low</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>69%</td>
+                    <td>69%</td>
+                    <td>66%</td>
+                    <td>90%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.246" target="_blank">Jigglypuff</a></strong></td>
+                    <td>10.20.0.246</td>
+                    <td>HP M553</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>87%</td>
+                    <td>77%</td>
+                    <td>78%</td>
+                    <td>79%</td>
+                    <td>68%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.208" target="_blank">Jynx</a></strong></td>
+                    <td>10.20.0.208</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>88%</td>
+                    <td>60%</td>
+                    <td>50%</td>
+                    <td>28%</td>
+                    <td>71%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.220" target="_blank">Konstantieva</a></strong></td>
+                    <td>10.20.0.220</td>
+                    <td>HP Color LaserJet CM4540f</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Black Cartridge very low | Magenta Cartridge very low | Supplies very low</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>35%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>77%</td>
+                    <td>75%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.214" target="_blank">Labelist</a></strong></td>
+                    <td>10.20.0.214</td>
+                    <td>HP LaserJet M402dn</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>23%</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.217" target="_blank">Leonardo</a></strong></td>
+                    <td>10.20.0.217</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Fuser Kit very low | Black Cartridge low</td>
+                    <td><span class='alert'>2%</span></td>
+                    <td>93%</td>
+                    <td>47%</td>
+                    <td>42%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.244" target="_blank">Lucario</a></strong></td>
+                    <td>10.20.0.244</td>
+                    <td>HP M555</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Cyan Cartridge very low | Magenta Cartridge very low</td>
+                    <td>49%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>98%</td>
+                    <td>94%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.248" target="_blank">Magikarp</a></strong></td>
+                    <td>10.20.0.248</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>87%</td>
+                    <td>94%</td>
+                    <td>94%</td>
+                    <td>94%</td>
+                    <td>100%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.205" target="_blank">Mercury</a></strong></td>
+                    <td>10.20.0.205</td>
+                    <td>Xerox AltaLink C8145</td>
+                    <td class="online">WARNING</td>
+                    <td >09-508-00 The Toner Waste Container is near end of life. User intervention is required to reorder the Toner Waste Container; do not replace until prompted. Device services are unaffected.</td>
+                    <td>23%</td>
+                    <td>32%</td>
+                    <td>22%</td>
+                    <td>78%</td>
+                    <td>89%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.219" target="_blank">Michaelangelo</a></strong></td>
+                    <td>10.20.0.219</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Magenta Cartridge very low</td>
+                    <td>66%</td>
+                    <td>78%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>60%</td>
+                    <td>76%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.232" target="_blank">Odysseus</a></strong></td>
+                    <td>10.20.0.232</td>
+                    <td>HP M651</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Fuser Kit very low | Cyan Cartridge very low | Magenta Cartridge very low</td>
+                    <td>85%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>14%</td>
+                    <td>27%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.243" target="_blank">Orion</a></strong></td>
+                    <td>10.20.0.243</td>
+                    <td>imageFORCE C7165</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>toner is low (cyan). | toner is low (yellow). | toner is low (black). | toner is low (magenta). | paper is out (letter).</td>
+                    <td>59%</td>
+                    <td>35%</td>
+                    <td>44%</td>
+                    <td>35%</td>
+                    <td>56%</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.234" target="_blank">Perseus</a></strong></td>
+                    <td>10.20.0.234</td>
+                    <td>HP M651</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>74%</td>
+                    <td>63%</td>
+                    <td>52%</td>
+                    <td>65%</td>
+                    <td>32%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.235" target="_blank">Pikachu</a></strong></td>
+                    <td>10.20.0.235</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Cyan Cartridge very low | Black Cartridge low | Yellow Cartridge low | Supplies low</td>
+                    <td><span class='alert'>2%</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>74%</td>
+                    <td><span class='alert'>3%</span></td>
+                    <td>41%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.225" target="_blank">Poliwag</a></strong></td>
+                    <td>10.20.0.225</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>9%</td>
+                    <td>57%</td>
+                    <td>59%</td>
+                    <td>48%</td>
+                    <td>98%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.239" target="_blank">Princess</a></strong></td>
+                    <td>10.20.0.239</td>
+                    <td>HP M555</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Fuser Kit very low | Magenta Cartridge very low | Yellow Cartridge very low | Black Cartridge very low</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>25%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.224" target="_blank">Prometheus</a></strong></td>
+                    <td>10.20.0.224</td>
+                    <td>HP Color LaserJet M551</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Cyan Cartridge very low | Magenta Cartridge very low | Supplies very low | Yellow Cartridge very low</td>
+                    <td>71%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>26%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.252" target="_blank">Psyduck</a></strong></td>
+                    <td>10.20.0.252</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>65%</td>
+                    <td>37%</td>
+                    <td>38%</td>
+                    <td>21%</td>
+                    <td>97%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.242" target="_blank">Raichu</a></strong></td>
+                    <td>10.20.0.242</td>
+                    <td>HP M555</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>17%</td>
+                    <td>57%</td>
+                    <td>56%</td>
+                    <td>56%</td>
+                    <td>73%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.207" target="_blank">Rainbow Alliance</a></strong></td>
+                    <td>10.20.0.207</td>
+                    <td>HP Color LaserJet 4700</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-critical'>REPLACE TRANSFER KIT | REPLACE SUPPLIES | REPLACE FUSER KIT</td>
+                    <td>40%</td>
+                    <td>99%</td>
+                    <td>46%</td>
+                    <td>78%</td>
+                    <td><span class='alert'>0%</span></td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.215" target="_blank">Raphael</a></strong></td>
+                    <td>10.20.0.215</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Black Cartridge very low</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>70%</td>
+                    <td>97%</td>
+                    <td>9%</td>
+                    <td>36%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.231" target="_blank">Scylla</a></strong></td>
+                    <td>10.20.0.231</td>
+                    <td>HP M651</td>
+                    <td class="offline">OFFLINE</td>
+                    <td >-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.206" target="_blank">Shinx</a></strong></td>
+                    <td>10.20.0.206</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>24%</td>
+                    <td>69%</td>
+                    <td>69%</td>
+                    <td>71%</td>
+                    <td>87%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.226" target="_blank">Slowpoke</a></strong></td>
+                    <td>10.20.0.226</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>90%</td>
+                    <td>93%</td>
+                    <td>92%</td>
+                    <td>91%</td>
+                    <td>100%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.238" target="_blank">Snorlax</a></strong></td>
+                    <td>10.20.0.238</td>
+                    <td>HP M553</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Tray 2 empty: Plain, Letter</td>
+                    <td>33%</td>
+                    <td>60%</td>
+                    <td>61%</td>
+                    <td>53%</td>
+                    <td>96%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.251" target="_blank">Spearow</a></strong></td>
+                    <td>10.20.0.251</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>14%</td>
+                    <td>54%</td>
+                    <td>53%</td>
+                    <td>55%</td>
+                    <td>97%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.222" target="_blank">Squirtle</a></strong></td>
+                    <td>10.20.0.222</td>
+                    <td>HP M555</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Magenta Cartridge very low</td>
+                    <td>32%</td>
+                    <td>68%</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>56%</td>
+                    <td>77%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.247" target="_blank">Totodile</a></strong></td>
+                    <td>10.20.0.247</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>83%</td>
+                    <td>39%</td>
+                    <td>75%</td>
+                    <td>75%</td>
+                    <td>86%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.230" target="_blank">Valkyrie</a></strong></td>
+                    <td>10.20.0.230</td>
+                    <td>HP M880z</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>91%</td>
+                    <td>76%</td>
+                    <td>28%</td>
+                    <td>35%</td>
+                    <td>90%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.218" target="_blank">Vulpix</a></strong></td>
+                    <td>10.20.0.218</td>
+                    <td>HP M554</td>
+                    <td class="online">RUNNING</td>
+                    <td >-</td>
+                    <td>34%</td>
+                    <td>89%</td>
+                    <td>89%</td>
+                    <td>89%</td>
+                    <td>89%</td>
+                    <td>OK</td>
+                </tr>
+        
+                <tr>
+                    <td><strong><a href="http://10.20.0.240" target="_blank">Zubat</a></strong></td>
+                    <td>10.20.0.240</td>
+                    <td>HP M554</td>
+                    <td class="online">WARNING</td>
+                    <td class='alert-warning'>Cyan Cartridge very low | Black Cartridge very low</td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td><span class='alert'>ERR</span></td>
+                    <td>36%</td>
+                    <td>32%</td>
+                    <td>26%</td>
+                    <td>OK</td>
+                </tr>
+        
+            </table>
+        </div>
+    </body>
+    </html>
+    

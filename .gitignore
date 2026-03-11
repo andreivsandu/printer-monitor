@@ -1,0 +1,40 @@
+# Env
+.env
+.env.local
+
+# Python-specific ignores
+# Compiled source
+__pycache__
+*.pyc
+*.pyd
+*.pyo
+*.egg-info/
+.eggs/
+
+# IDE/Editor files
+# VSCode
+.vscode/
+# PyCharm/IntelliJ
+.idea/
+# General IDE files
+*.swp
+*~
+
+# Virtual environments
+venv
+env
+/venv/
+/env/
+pip-wheel-metadata/
+.tox/
+.coverage
+.mypy_cache/
+.pytest_cache/
+
+# macOS-specific ignores
+.DS_Store
+
+# Misc
+*.log
+*.sqlite
+
