@@ -1,6 +1,5 @@
 # Env
 .env
-.env.local
 alert_state.json
 printer_dashboard.html
 runtime/
