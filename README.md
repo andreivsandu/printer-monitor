@@ -1,0 +1,100 @@
+# Printer Monitor
+
+This project generates and serves a live office printer dashboard. It polls printers over SNMP, rebuilds `printer_dashboard.html`, and serves the dashboard over HTTP.
+
+## Project files
+
+The main project files are:
+
+- `generate_dashboard.py`
+- `app.py`
+- `printers.csv`
+- `alert_state.json`
+- `printer_dashboard.html`
+
+## Local development
+
+For local development, use only the base Compose file so Docker does not require the external proxy network.
+
+Set this in `.env`:
+
+```env
+COMPOSE_FILE=docker-compose.yml
+```
+
+Then start the app with:
+
+```bash
+docker compose up --build
+```
+
+In this mode:
+
+- The app is available directly on `http://localhost:8000`
+- If you are running locally via OrbStack, the app is also available by default at `http://printer-monitor.orb.local/` and `https://printer-monitor.orb.local/` through OrbStack's built-in reverse proxy
+- The project root is bind-mounted into `/app` for live code edits
+- The container serves the dashboard from `/`
+- The dashboard is refreshed every 15 minutes by default
+
+## Local dev un-dockerized
+
+Initially:
+
+```
+pyenv virtualenv flask-apps # if not created already
+pyenv activate flask-apps
+pip install -r requirements.txt
+```
+
+After:
+```
+pyenv activate flask-apps
+python app.py
+```
+
+## Legacy local script
+
+`start_server.command` is now mostly optional, because the Dockerized web app already serves the dashboard and handles periodic refreshes.
+
+It can still be useful if you want a simple non-Docker local workflow on a Mac, or if you want to run the generator and static file server directly from the project folder.
+
+When you run `start_server.command`:
+
+- It starts Python's built-in static web server on port `8000`
+- It serves `printer_dashboard.html` directly
+- It runs `generate_dashboard.py` in a loop every 15 minutes
+- It does not run the Flask app, Docker healthcheck, or reverse-proxy-aware deployment setup
+
+## Production deployment
+
+For production, use both Compose files so the Caddy labels and external proxy network are enabled:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
+```
+
+In this mode:
+
+- The default public host is `printer-monitor.goldwaterdroit.com`
+- Caddy proxies traffic to the container on internal port `8000`
+- The source bind mount is removed
+- The container runs Gunicorn
+
+## Environment variables
+
+Optional environment variables include:
+
+- `PRINTER_MONITOR_REFRESH_INTERVAL_SECONDS`
+- `PRINTER_MONITOR_SEND_EMAILS`
+- `PRINTER_MONITOR_SMTP_SERVER`
+- `PRINTER_MONITOR_SMTP_PORT`
+- `PRINTER_MONITOR_SENDER_EMAIL`
+- `PRINTER_MONITOR_RECIPIENT_EMAILS`
+- `PRINTER_MONITOR_PORT`
+- `PRINTER_MONITOR_SERVER_NAME`
+- `FRONTEND_PROXY_NETWORK`
+
+## Notes
+
+- The container installs the `snmp` package because the dashboard generator relies on `snmpget` and `snmpwalk`.
+- The production override expects an existing external Docker network named `frontend-proxy` unless you set `FRONTEND_PROXY_NETWORK` differently.

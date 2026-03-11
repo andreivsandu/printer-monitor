@@ -1,0 +1,16 @@
+services:
+  printer-monitor:
+    command: gunicorn --bind 0.0.0.0:8000 app:app
+    ports: !reset []
+    volumes: !override
+      - ./printers.csv:/app/printers.csv:ro
+      - ./alert_state.json:/app/alert_state.json
+    labels:
+      caddy: "${PRINTER_MONITOR_SERVER_NAME:-printer-monitor.goldwaterdroit.com}"
+      caddy.reverse_proxy: "/* {{ upstreams http 8000 }}"
+
+networks:
+  frontend-proxy:
+    external: true
+    driver: "bridge"
+    name: "${FRONTEND_PROXY_NETWORK:-frontend-proxy}"

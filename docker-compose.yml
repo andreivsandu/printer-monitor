@@ -1,0 +1,41 @@
+services:
+  printer-monitor:
+    build:
+      context: .
+    restart: unless-stopped
+    command: python app.py
+    labels:
+      dev.orbstack.domains: "${PRINTER_MONITOR_DEV_DOMAIN:-printer-monitor.orb.local}"
+    ports:
+      - "${PRINTER_MONITOR_PORT:-8000}:8000"
+    expose:
+      - 8000
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PRINTER_MONITOR_REFRESH_INTERVAL_SECONDS: "${PRINTER_MONITOR_REFRESH_INTERVAL_SECONDS:-900}"
+      PRINTER_MONITOR_SEND_EMAILS: "${PRINTER_MONITOR_SEND_EMAILS:-true}"
+      PRINTER_MONITOR_SMTP_SERVER: "${PRINTER_MONITOR_SMTP_SERVER:-smtp.goldwaterdube.com}"
+      PRINTER_MONITOR_SMTP_PORT: "${PRINTER_MONITOR_SMTP_PORT:-25}"
+      PRINTER_MONITOR_SENDER_EMAIL: "${PRINTER_MONITOR_SENDER_EMAIL:-no-reply@goldwaterdube.com}"
+      PRINTER_MONITOR_RECIPIENT_EMAILS: "${PRINTER_MONITOR_RECIPIENT_EMAILS:-as@goldwaterdroit.com}"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - default
+      - frontend-proxy
+
+networks:
+  frontend-proxy:
+    name: "${FRONTEND_PROXY_NETWORK:-frontend-proxy}"

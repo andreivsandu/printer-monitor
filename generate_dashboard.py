@@ -10,18 +10,18 @@ import smtplib
 # =========================
 # CONFIGURATION
 # =========================
-BASE_PATH = "/Users/as/Documents/Printer monitor html"
-CSV_FILE = f"{BASE_PATH}/printers.csv"
-HTML_FILE = f"{BASE_PATH}/printer_dashboard.html"
-STATE_FILE = f"{BASE_PATH}/alert_state.json" 
+BASE_PATH = os.environ.get("PRINTER_MONITOR_BASE_PATH", os.path.dirname(os.path.abspath(__file__)))
+CSV_FILE = os.environ.get("PRINTER_MONITOR_CSV_FILE", f"{BASE_PATH}/printers.csv")
+HTML_FILE = os.environ.get("PRINTER_MONITOR_HTML_FILE", f"{BASE_PATH}/printer_dashboard.html")
+STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{BASE_PATH}/alert_state.json") 
 
 # === EMAIL ALERTS CONFIG ===
-SEND_EMAILS = True 
+SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "true" 
 
-SMTP_SERVER = "smtp.goldwaterdube.com"  
-SMTP_PORT = 25                 
-SENDER_EMAIL = "no-reply@goldwaterdube.com"
-RECIPIENT_EMAILS = ["as@goldwaterdroit.com"]
+SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp.goldwaterdube.com")  
+SMTP_PORT = int(os.environ.get("PRINTER_MONITOR_SMTP_PORT", "25"))                 
+SENDER_EMAIL = os.environ.get("PRINTER_MONITOR_SENDER_EMAIL", "no-reply@goldwaterdube.com")
+RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_RECIPIENT_EMAILS", "as@goldwaterdroit.com").split(",") if email.strip()]
 
 # === COMPANY POLICY ===
 TONER_LOW_THRESHOLD = 5     
