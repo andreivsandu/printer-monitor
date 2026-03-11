@@ -15,9 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py ./app.py
 COPY generate_dashboard.py ./generate_dashboard.py
-COPY printers.csv ./printers.csv
-COPY alert_state.json ./alert_state.json
-COPY printer_dashboard.html ./printer_dashboard.html
+
+RUN mkdir -p /app/runtime
 
 EXPOSE 8000
 

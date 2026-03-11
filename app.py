@@ -2,7 +2,7 @@ import os
 import threading
 import time
 
-from flask import Flask, jsonify, send_file
+from flask import Flask, Response, jsonify, send_file
 
 from generate_dashboard import HTML_FILE, main as generate_dashboard
 
@@ -43,13 +43,47 @@ def ensure_refresh_thread_started():
             refresh_thread.start()
 
 
+def render_startup_page(message, status_code):
+    html = f"""<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+    <meta charset=\"utf-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+    <meta http-equiv=\"refresh\" content=\"5\">
+    <title>Printer Monitor</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; background: #f4f7f6; color: #1f2933; margin: 0; }}
+        .wrap {{ min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }}
+        .card {{ max-width: 640px; width: 100%; background: #ffffff; border-radius: 16px; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12); padding: 32px; }}
+        h1 {{ margin: 0 0 12px; font-size: 1.75rem; }}
+        p {{ margin: 0 0 12px; line-height: 1.6; }}
+        .muted {{ color: #52606d; }}
+        .pill {{ display: inline-block; margin-top: 8px; padding: 8px 12px; border-radius: 999px; background: #e0f2fe; color: #075985; font-weight: 600; }}
+        a {{ color: #0f6fff; text-decoration: none; }}
+    </style>
+</head>
+<body>
+    <div class=\"wrap\">
+        <div class=\"card\">
+            <h1>Printer dashboard is warming up</h1>
+            <p>{message}</p>
+            <p class=\"muted\">The server is up, but the first SNMP polling cycle is still generating the dashboard. This page will refresh automatically every 5 seconds.</p>
+            <div class=\"pill\">Status: starting</div>
+            <p class=\"muted\"><a href=\"/health\">View health status</a></p>
+        </div>
+    </div>
+</body>
+</html>"""
+    return Response(html, status=status_code, mimetype="text/html")
+
+
 @app.route('/')
 def index():
     ensure_refresh_thread_started()
     if not os.path.exists(HTML_FILE):
         message = last_refresh_error or 'Initial dashboard generation in progress'
         status_code = 503 if last_refresh_error else 202
-        return f"Printer dashboard unavailable: {message}", status_code
+        return render_startup_page(message, status_code)
     return send_file(HTML_FILE)
 
 

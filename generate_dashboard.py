@@ -12,8 +12,9 @@ import smtplib
 # =========================
 BASE_PATH = os.environ.get("PRINTER_MONITOR_BASE_PATH", os.path.dirname(os.path.abspath(__file__)))
 CSV_FILE = os.environ.get("PRINTER_MONITOR_CSV_FILE", f"{BASE_PATH}/printers.csv")
-HTML_FILE = os.environ.get("PRINTER_MONITOR_HTML_FILE", f"{BASE_PATH}/printer_dashboard.html")
-STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{BASE_PATH}/alert_state.json") 
+RUNTIME_DIR = os.environ.get("PRINTER_MONITOR_RUNTIME_DIR", f"{BASE_PATH}/runtime")
+HTML_FILE = os.environ.get("PRINTER_MONITOR_HTML_FILE", f"{RUNTIME_DIR}/printer_dashboard.html")
+STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{RUNTIME_DIR}/alert_state.json") 
 
 # === EMAIL ALERTS CONFIG ===
 SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "true" 
@@ -48,6 +49,11 @@ FORCE_SHOPPING_LIST = [
     "C7165 (Orion)",
     "HP M402dn (Labelist)"
 ]
+
+def ensure_parent_dir(path):
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
 
 # === EXACT PART NUMBERS CHEAT SHEET ===
 PART_NUMBERS = {
@@ -592,6 +598,7 @@ Westmount, QC H3Z 3C1`;
     </html>
     """
     
+    ensure_parent_dir(HTML_FILE)
     with open(HTML_FILE, "w", encoding="utf-8") as f:
         f.write(html)
 
@@ -600,6 +607,8 @@ Westmount, QC H3Z 3C1`;
 # =========================
 def main():
     printer_data = []
+    ensure_parent_dir(STATE_FILE)
+    ensure_parent_dir(HTML_FILE)
     
     shopping_counts = {}
     for forced_model in FORCE_SHOPPING_LIST:
