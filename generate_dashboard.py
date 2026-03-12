@@ -723,12 +723,16 @@ def main():
 
             if alerts_data['is_critical']:
                 current_broken_printers.append(name) 
-                if name not in alert_state:
-                    logger.info("New critical alert detected for %s; sending notification", name)
+                
+                # Check if it's a new broken printer, OR if the error message has changed!
+                if name not in alert_state or alert_state[name] != alerts_data['text']:
+                    logger.info("New or updated critical alert detected for %s; sending notification", name)
                     send_critical_email(name, ip, alerts_data['text'])
-                    alert_state[name] = True
+                    alert_state[name] = alerts_data['text'] # Save the EXACT error text
                 else:
                     logger.debug("Critical alert for %s already recorded in alert state", name)
+                
+                    
 
             waste_display = format_waste(waste_raw)
 
