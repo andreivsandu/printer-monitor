@@ -84,6 +84,13 @@ def format_display_timestamp(value):
     return value.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
+def get_smtp_local_hostname(sender_email):
+    sender_domain = sender_email.rsplit("@", 1)[1].strip() if "@" in sender_email else ""
+    if sender_domain:
+        return f"printer-monitor.{sender_domain}"
+    return "printer-monitor.local"
+
+
 def ensure_parent_dir(path):
     directory = os.path.dirname(path)
     if directory:
@@ -211,17 +218,39 @@ def send_critical_email(printer_name, ip_address, error_text):
     if not SEND_EMAILS:
         logger.info("Email alerts disabled; skipping alert email for %s", printer_name)
         return
-        
+
     msg = EmailMessage()
     msg.set_content(f"CRITICAL PRINTER ALERT\n\nPrinter: {printer_name}\nIP Address: {ip_address}\nError: {error_text}\n\nPlease check the dashboard for more details or click here to access the printer UI: http://{ip_address}")
-    
+
     msg['Subject'] = f"🚨 Printer Alert: {printer_name} requires attention"
     msg['From'] = SENDER_EMAIL
     msg['To'] = ", ".join(RECIPIENT_EMAILS)
+    smtp_local_hostname = get_smtp_local_hostname(SENDER_EMAIL)
+
+    logger.info(
+        "Sending alert email for %s via %s:%s from %s using EHLO %s",
+        printer_name,
+        SMTP_SERVER,
+        SMTP_PORT,
+        SENDER_EMAIL,
+        smtp_local_hostname,
+    )
+    logger.debug(
+        "Alert email recipients for %s: %s",
+        printer_name,
+        ", ".join(RECIPIENT_EMAILS),
+    )
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.send_message(msg)
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, local_hostname=smtp_local_hostname) as server:
+            ehlo_code, ehlo_response = server.ehlo()
+            logger.debug(
+                "SMTP EHLO completed for %s with code=%s response=%s",
+                printer_name,
+                ehlo_code,
+                ehlo_response.decode(errors='replace') if isinstance(ehlo_response, bytes) else ehlo_response,
+            )
+            server.send_message(msg, from_addr=SENDER_EMAIL, to_addrs=RECIPIENT_EMAILS)
         logger.info("Alert email sent for %s", printer_name)
     except Exception:
         logger.exception("Failed to send alert email for %s", printer_name)
