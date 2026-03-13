@@ -656,8 +656,6 @@ def main():
     logger.info("Starting dashboard generation using CSV=%s STATE=%s HTML=%s", CSV_FILE, STATE_FILE, HTML_FILE)
     
     shopping_counts = {}
-    for forced_model in FORCE_SHOPPING_LIST:
-        shopping_counts[forced_model] = {'Black': 0, 'Cyan': 0, 'Magenta': 0, 'Yellow': 0, 'Fuser': 0, 'Waste': 0}
     
     alert_state = {}
     if os.path.exists(STATE_FILE):
