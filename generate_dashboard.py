@@ -60,26 +60,20 @@ TONER_LOW_THRESHOLD = 5
 WASTE_FULL_THRESHOLD = 90   
 
 # === SHOPPING LIST NICKNAMES ===
+# === SHOPPING LIST NICKNAMES ===
 SUPPLY_MAPPING = {
     "HP M554": "HP M554 / M555 Series",
     "HP M555": "HP M554 / M555 Series",
-    "HP M402dn": "HP M402dn (Labelist)",
+    "HP LaserJet M402dn": "HP M402dn (Labelist)",
     "Canon C5860": "Canon C5860 (Galactica)",
     "HP 2400": "HP 2400 (Exchequer)",
     "HP Color LaserJet 4525": "HP Color LaserJet 4525 (Dr. Zaius)",
     "HP Color LaserJet 4700": "HP Color LaserJet 4700 (RainbowAlliance)",
     "HP Color LaserJet CM4540f": "HP Color LaserJet CM4540f (Konstantieva)",
     "HP M880z": "HP M880z (Valkrye)",
-    "C7165": "C7165 (Orion)",
-    "imageFORCE C7165": "C7165 (Orion)",
-    "Xerox AltaLink C8145": "Xerox AltaLink C8145 (Mercury)"
+    "imageFORCE C7165": "Canon C7165 (Orion)",
+    "Xerox AltaLink C8145": "Xerox C8145 (Mercury)"
 }
-
-FORCE_SHOPPING_LIST = [
-    "HP 2400 (Exchequer)",
-    "C7165 (Orion)",
-    "HP M402dn (Labelist)"
-]
 
 
 def get_local_now():
@@ -130,10 +124,10 @@ PART_NUMBERS = {
     "HP M880z (Valkrye)": {
         "Black": "CF300A", "Cyan": "CF301A", "Magenta": "CF303A", "Yellow": "CF302A", "Fuser": "C1N54A", "Waste": "C1N58A"
     },
-    "C7165 (Orion)": {
+    "Canon C7165 (Orion)": {
         "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow", "Fuser": "Fuser", "Waste": "Waste"
     },
-    "Xerox AltaLink C8145 (Mercury)": {
+    "Xerox C8145 (Mercury)": {
         "Black": "006R01746", "Cyan": "006R01747", "Magenta": "006R01748", "Yellow": "006R01749", "Fuser": "TBD", "Waste": "008R13325"
     }
 }
@@ -528,7 +522,7 @@ Westmount, QC H3Z 3C1`;
     sorted_models = sorted(shopping_counts.keys(), key=lambda x: x.lower())
     for model in sorted_models:
         counts = shopping_counts[model]
-        if sum(counts.values()) > 0 or model in FORCE_SHOPPING_LIST:
+        if sum(counts.values()) > 0:
             
             parts_to_order = []
             model_parts = PART_NUMBERS.get(model, {})
@@ -662,8 +656,6 @@ def main():
     logger.info("Starting dashboard generation using CSV=%s STATE=%s HTML=%s", CSV_FILE, STATE_FILE, HTML_FILE)
     
     shopping_counts = {}
-    for forced_model in FORCE_SHOPPING_LIST:
-        shopping_counts[forced_model] = {'Black': 0, 'Cyan': 0, 'Magenta': 0, 'Yellow': 0, 'Fuser': 0, 'Waste': 0}
     
     alert_state = {}
     if os.path.exists(STATE_FILE):
