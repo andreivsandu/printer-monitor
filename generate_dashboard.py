@@ -50,9 +50,9 @@ logger.info("Using printer monitor timezone %s", APP_TIMEZONE_NAME)
 # === EMAIL ALERTS CONFIG ===
 SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "true" 
 
-SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp.goldwaterdube.com")  
+SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp-relay.gmail.com")  
 SMTP_PORT = int(os.environ.get("PRINTER_MONITOR_SMTP_PORT", "25"))                 
-SENDER_EMAIL = os.environ.get("PRINTER_MONITOR_SENDER_EMAIL", "no-reply@goldwaterdube.com")
+SENDER_EMAIL = os.environ.get("PRINTER_MONITOR_SENDER_EMAIL", "no-reply@goldwaterdroit.com")
 RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_RECIPIENT_EMAILS", "as@goldwaterdroit.com").split(",") if email.strip()]
 
 # === COMPANY POLICY ===
