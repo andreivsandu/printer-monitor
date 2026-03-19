@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+import socket
 import csv
 import subprocess
 import json
@@ -52,6 +53,7 @@ SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "
 
 SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp-relay.gmail.com")  
 SMTP_PORT = int(os.environ.get("PRINTER_MONITOR_SMTP_PORT", "25"))                 
+SMTP_EHLO_HOSTNAME = os.environ.get("PRINTER_MONITOR_SMTP_EHLO_HOSTNAME", "").strip()
 SENDER_EMAIL = os.environ.get("PRINTER_MONITOR_SENDER_EMAIL", "no-reply@goldwaterdroit.com")
 RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_RECIPIENT_EMAILS", "as@goldwaterdroit.com").split(",") if email.strip()]
 
@@ -85,10 +87,22 @@ def format_display_timestamp(value):
 
 
 def get_smtp_local_hostname(sender_email):
+    if SMTP_EHLO_HOSTNAME:
+        return SMTP_EHLO_HOSTNAME
+
+    system_fqdn = socket.getfqdn().strip()
+    if system_fqdn and system_fqdn.lower() != "localhost" and "." in system_fqdn:
+        return system_fqdn
+
     sender_domain = sender_email.rsplit("@", 1)[1].strip() if "@" in sender_email else ""
     if sender_domain:
-        return f"printer-monitor.{sender_domain}"
-    return "printer-monitor.local"
+        return sender_domain
+
+    system_hostname = socket.gethostname().strip()
+    if system_hostname and system_hostname.lower() != "localhost":
+        return system_hostname
+
+    return "localhost"
 
 
 def ensure_parent_dir(path):

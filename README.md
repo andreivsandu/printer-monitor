@@ -120,6 +120,7 @@ Optional environment variables include:
 - `PRINTER_MONITOR_SEND_EMAILS`
 - `PRINTER_MONITOR_SMTP_SERVER`
 - `PRINTER_MONITOR_SMTP_PORT`
+- `PRINTER_MONITOR_SMTP_EHLO_HOSTNAME`
 - `PRINTER_MONITOR_SENDER_EMAIL`
 - `PRINTER_MONITOR_RECIPIENT_EMAILS`
 - `PRINTER_MONITOR_PORT`
@@ -134,7 +135,6 @@ Optional environment variables include:
 - `printers.csv` is committed source data and is intentionally provided from the host in production instead of being baked into the image.
 - Generated files are intentionally not committed; the app creates `runtime/alert_state.json` and `runtime/printer_dashboard.html` automatically.
 - A host directory bind mount is used for runtime state because binding individual files that do not yet exist on the host is fragile; if you want to be explicit on first deploy, run `mkdir -p runtime` before starting the production stack.
+- `PRINTER_MONITOR_SMTP_EHLO_HOSTNAME` should be set to a real SMTP HELO/EHLO identity, ideally the fully qualified domain name of the sending host when using Google Workspace SMTP relay.
 - `PRINTER_MONITOR_TIMEZONE` controls application display timestamps and defaults to `America/Toronto`; invalid values fall back to that default.
 - `TZ` controls the container process timezone and therefore log timestamps; by default it is also set to `America/Toronto` so the dashboard and logs stay aligned.
-
-
