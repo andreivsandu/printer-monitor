@@ -54,6 +54,7 @@ SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "
 SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp-relay.gmail.com")  
 SMTP_PORT = int(os.environ.get("PRINTER_MONITOR_SMTP_PORT", "25"))                 
 SMTP_EHLO_HOSTNAME = os.environ.get("PRINTER_MONITOR_SMTP_EHLO_HOSTNAME", "").strip()
+SMTP_LOG_PROTOCOL = os.environ.get("PRINTER_MONITOR_SMTP_LOG_PROTOCOL", "false").lower() == "true"
 SENDER_EMAIL = os.environ.get("PRINTER_MONITOR_SENDER_EMAIL", "no-reply@goldwaterdroit.com")
 RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_RECIPIENT_EMAILS", "as@goldwaterdroit.com").split(",") if email.strip()]
 
@@ -76,6 +77,49 @@ SUPPLY_MAPPING = {
     "imageFORCE C7165": "Canon C7165 (Orion)",
     "Xerox AltaLink C8145": "Xerox C8145 (Mercury)"
 }
+
+
+def format_smtp_response(response):
+    if isinstance(response, bytes):
+        return response.decode(errors='replace')
+    return response
+
+
+def sanitize_smtp_command(command_text):
+    if command_text.upper().startswith("AUTH "):
+        return "AUTH <redacted>"
+    return command_text
+
+
+class InstrumentedSMTP(smtplib.SMTP):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.protocol_logging_enabled = False
+        self.protocol_logger = None
+        self.protocol_context = ""
+
+    def configure_protocol_logging(self, enabled, protocol_logger, protocol_context):
+        self.protocol_logging_enabled = enabled
+        self.protocol_logger = protocol_logger
+        self.protocol_context = protocol_context
+
+    def _log_protocol(self, direction, payload):
+        if self.protocol_logging_enabled and self.protocol_logger:
+            self.protocol_logger.debug("SMTP %s %s: %s", direction, self.protocol_context, payload)
+
+    def putcmd(self, cmd, args=""):
+        command_text = f"{cmd} {args}".strip()
+        self._log_protocol("C", sanitize_smtp_command(command_text))
+        return super().putcmd(cmd, args)
+
+    def getreply(self):
+        code, response = super().getreply()
+        response_text = format_smtp_response(response)
+        if code == -1:
+            self._log_protocol("S", response_text)
+        else:
+            self._log_protocol("S", f"{code} {response_text}")
+        return code, response
 
 
 def get_local_now():
@@ -256,16 +300,39 @@ def send_critical_email(printer_name, ip_address, error_text):
     )
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, local_hostname=smtp_local_hostname) as server:
+        with InstrumentedSMTP(local_hostname=smtp_local_hostname) as server:
+            server.configure_protocol_logging(SMTP_LOG_PROTOCOL, logger, printer_name)
+            connect_code, connect_response = server.connect(SMTP_SERVER, SMTP_PORT)
+            logger.debug(
+                "SMTP connect completed for %s with code=%s response=%s local_hostname=%s peer=%s sockname=%s",
+                printer_name,
+                connect_code,
+                format_smtp_response(connect_response),
+                server.local_hostname,
+                server.sock.getpeername() if server.sock else None,
+                server.sock.getsockname() if server.sock else None,
+            )
             ehlo_code, ehlo_response = server.ehlo()
             logger.debug(
-                "SMTP EHLO completed for %s with code=%s response=%s",
+                "SMTP EHLO completed for %s with code=%s response=%s does_esmtp=%s features=%s",
                 printer_name,
                 ehlo_code,
-                ehlo_response.decode(errors='replace') if isinstance(ehlo_response, bytes) else ehlo_response,
+                format_smtp_response(ehlo_response),
+                server.does_esmtp,
+                server.esmtp_features,
             )
             server.send_message(msg, from_addr=SENDER_EMAIL, to_addrs=RECIPIENT_EMAILS)
         logger.info("Alert email sent for %s", printer_name)
+    except smtplib.SMTPSenderRefused as exc:
+        logger.error(
+            "SMTP sender refused for %s with code=%s sender=%s ehlo=%s response=%s",
+            printer_name,
+            exc.smtp_code,
+            exc.sender,
+            smtp_local_hostname,
+            format_smtp_response(exc.smtp_error),
+        )
+        logger.exception("Failed to send alert email for %s", printer_name)
     except Exception:
         logger.exception("Failed to send alert email for %s", printer_name)
 
