@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import os
 import socket
+import ssl
 import csv
 import subprocess
 import json
@@ -55,6 +56,8 @@ SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp-relay.gmail.co
 SMTP_PORT = int(os.environ.get("PRINTER_MONITOR_SMTP_PORT", "25"))                 
 SMTP_EHLO_HOSTNAME = os.environ.get("PRINTER_MONITOR_SMTP_EHLO_HOSTNAME", "").strip()
 SMTP_LOG_PROTOCOL = os.environ.get("PRINTER_MONITOR_SMTP_LOG_PROTOCOL", "false").lower() == "true"
+SMTP_STARTTLS = os.environ.get("PRINTER_MONITOR_SMTP_STARTTLS", "false").lower() == "true"
+SMTP_REQUIRE_STARTTLS = os.environ.get("PRINTER_MONITOR_SMTP_REQUIRE_STARTTLS", "false").lower() == "true"
 SENDER_EMAIL = os.environ.get("PRINTER_MONITOR_SENDER_EMAIL", "no-reply@goldwaterdroit.com")
 RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_RECIPIENT_EMAILS", "as@goldwaterdroit.com").split(",") if email.strip()]
 
@@ -321,6 +324,35 @@ def send_critical_email(printer_name, ip_address, error_text):
                 server.does_esmtp,
                 server.esmtp_features,
             )
+            if SMTP_STARTTLS:
+                starttls_supported = server.has_extn("starttls")
+                logger.debug(
+                    "SMTP STARTTLS availability for %s: requested=%s required=%s supported=%s",
+                    printer_name,
+                    SMTP_STARTTLS,
+                    SMTP_REQUIRE_STARTTLS,
+                    starttls_supported,
+                )
+                if not starttls_supported:
+                    if SMTP_REQUIRE_STARTTLS:
+                        raise smtplib.SMTPNotSupportedError("SMTP server does not advertise STARTTLS")
+                else:
+                    starttls_code, starttls_response = server.starttls(context=ssl.create_default_context())
+                    logger.debug(
+                        "SMTP STARTTLS completed for %s with code=%s response=%s",
+                        printer_name,
+                        starttls_code,
+                        format_smtp_response(starttls_response),
+                    )
+                    ehlo_code, ehlo_response = server.ehlo()
+                    logger.debug(
+                        "SMTP post-STARTTLS EHLO completed for %s with code=%s response=%s does_esmtp=%s features=%s",
+                        printer_name,
+                        ehlo_code,
+                        format_smtp_response(ehlo_response),
+                        server.does_esmtp,
+                        server.esmtp_features,
+                    )
             server.send_message(msg, from_addr=SENDER_EMAIL, to_addrs=RECIPIENT_EMAILS)
         logger.info("Alert email sent for %s", printer_name)
     except smtplib.SMTPSenderRefused as exc:
