@@ -106,6 +106,10 @@ class InstrumentedSMTP(smtplib.SMTP):
         self.protocol_logger = protocol_logger
         self.protocol_context = protocol_context
 
+    def connect(self, host='localhost', port=0, source_address=None):
+        self._host = host
+        return super().connect(host=host, port=port, source_address=source_address)
+
     def _log_protocol(self, direction, payload):
         if self.protocol_logging_enabled and self.protocol_logger:
             self.protocol_logger.debug("SMTP %s %s: %s", direction, self.protocol_context, payload)
