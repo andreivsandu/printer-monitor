@@ -383,8 +383,12 @@ def get_printer_alerts(ip, community):
         return {"text": "", "is_critical": False, "is_warning": False}
 
     ignore_list = ["ready", "sleep mode", "power save", "ok", "printing", "warming up", "sleep mode on"]
-    critical_keywords = ["jam", "replace", "dead", "depleted", "exhausted", "error", "service", "offline", "install", "paused"] 
-    warning_keywords = ["low", "very low", "used supply", "open", "empty", "load"] 
+    
+    # "jam", "dead", "service", and specific HP numbered errors mean the printer is actually broken.
+    critical_keywords = ["jam", "dead", "depleted", "exhausted", "service", "offline", "install", "failure", "41.", "49.", "50.", "59."] 
+    
+    # "paused", "error", "cleaning", and "empty" are now just yellow warnings. NO EMAILS.
+    warning_keywords = ["low", "very low", "used supply", "open", "empty", "load", "paused", "cleaning", "tray", "error"]
 
     valid_alerts_found = []
 
@@ -854,7 +858,7 @@ def main():
             
             # --- OVERRIDE DASHBOARD ALERTS WITH FAILSAFE ---
             if failsafe_errors:
-                alerts_data['is_critical'] = True
+                alerts_data['is_warning'] = True  # <--- CHANGED FROM is_critical to is_warning
                 if alerts_data['text']:
                     alerts_data['text'] = alerts_data['text'] + " | " + " | ".join(failsafe_errors)
                 else:
