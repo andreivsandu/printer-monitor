@@ -63,7 +63,7 @@ RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_R
 
 # === COMPANY POLICY ===
 TONER_LOW_THRESHOLD = 5     
-WASTE_FULL_THRESHOLD = 90   
+WASTE_FULL_THRESHOLD = 95   
 
 # === SHOPPING LIST NICKNAMES ===
 # === SHOPPING LIST NICKNAMES ===
@@ -255,9 +255,10 @@ def to_number(value):
     except: return ""
 
 def format_waste(value):
-    if value in [-2, -3]: return "OK"
+    if value == -3: return "OK"
+    if value == -2: return "REPLACE"
     if value == -1: return "?"
-    return value 
+    return value
 
 def map_status(value):
     return {"2": "RUNNING", "3": "WARNING", "5": "DOWN"}.get(value, "OFFLINE")
@@ -728,6 +729,7 @@ Westmount, QC H3Z 3C1`;
     def format_supply(val, is_waste=False, color_type="black"):
         if val == "" or val is None: return "-"
         if val in ["OK", "?"]: return val
+        if val == "REPLACE": return "<span class='offline'>REPLACE</span>"
         if isinstance(val, int):
             
             bar_color = "var(--toner-fuser)"
@@ -881,7 +883,7 @@ def main():
             if isinstance(fuser, int) and (fuser <= TONER_LOW_THRESHOLD or fuser == 0 or fuser == -2):
                 shopping_counts[shopping_model_name]['Fuser'] += 1
 
-            if isinstance(waste_raw, int) and waste_raw >= 0 and waste_raw <= WASTE_FULL_THRESHOLD:
+            if (isinstance(waste_raw, int) and waste_raw >= WASTE_FULL_THRESHOLD) or waste_raw == -2:
                 shopping_counts[shopping_model_name]['Waste'] += 1
 
             printer_data.append({
