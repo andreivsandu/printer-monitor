@@ -255,8 +255,7 @@ def to_number(value):
     except: return ""
 
 def format_waste(value):
-    if value == -3: return "OK"
-    if value == -2: return "REPLACE"
+    if value in [-2, -3]: return "OK"
     if value == -1: return "?"
     return value
 
@@ -874,7 +873,12 @@ def main():
                 
                     
 
-            waste_display = format_waste(waste_raw)
+            waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
+            if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
+                waste_raw = "REPLACE"
+                waste_display = "REPLACE"
+            else:
+                waste_display = format_waste(waste_raw)
 
             for color, val in [("Black", b), ("Cyan", c), ("Magenta", m), ("Yellow", y)]:
                 if isinstance(val, int) and (val <= TONER_LOW_THRESHOLD or val == -2):
@@ -883,7 +887,7 @@ def main():
             if isinstance(fuser, int) and (fuser <= TONER_LOW_THRESHOLD or fuser == 0 or fuser == -2):
                 shopping_counts[shopping_model_name]['Fuser'] += 1
 
-            if (isinstance(waste_raw, int) and waste_raw >= WASTE_FULL_THRESHOLD) or waste_raw == -2:
+            if (isinstance(waste_raw, int) and waste_raw >= WASTE_FULL_THRESHOLD) or waste_raw == "REPLACE":
                 shopping_counts[shopping_model_name]['Waste'] += 1
 
             printer_data.append({
