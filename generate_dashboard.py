@@ -849,6 +849,9 @@ def main():
             y = get_supply_percent(ip, community, original_model, "yellow")
             fuser = get_supply_percent(ip, community, original_model, "fuser")
             waste_raw = get_supply_percent(ip, community, original_model, "waste")
+            # --- XEROX OID FIX ---
+            if "Xerox" in original_model or "AltaLink" in original_model:
+                waste_raw = -3  # Force to OK. The generic OID reads Drums on Xerox!
 
             # --- THE FIX: Failsafe now flags both 0 AND -2 (Error) ---
             failsafe_errors = []
