@@ -20,7 +20,7 @@ if not logging.getLogger().handlers:
 logger = logging.getLogger("printer_monitor.app")
 logger.setLevel(LOG_LEVEL)
 
-REFRESH_INTERVAL_SECONDS = int(os.environ.get("PRINTER_MONITOR_REFRESH_INTERVAL_SECONDS", "900"))
+REFRESH_INTERVAL_SECONDS = int(os.environ.get("PRINTER_MONITOR_REFRESH_INTERVAL_SECONDS", "300"))
 last_refresh_error = None
 refresh_lock = threading.Lock()
 refresh_thread = None
