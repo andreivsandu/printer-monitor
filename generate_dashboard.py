@@ -579,18 +579,57 @@ Westmount, QC H3Z 3C1`;
 
             // Smooth Background Refresh (Checks every 1 minute)
             function startAutoRefresh() {
+                console.log("Auto-refresh timer started!");
+                addSyncIndicator(); // Add visual proof immediately
+
                 setInterval(async () => {
                     try {
+                        console.log("Attempting to fetch new data...");
+                        
                         // The ?t= timestamp completely blocks browser caching
                         const url = window.location.pathname + "?t=" + new Date().getTime();
                         const response = await fetch(url, { cache: 'no-store' });
+                        
+                        if (!response.ok) {
+                            throw new Error("Server returned status: " + response.status);
+                        }
+
                         const html = await response.text();
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
                         
-                        document.getElementById('live-content').innerHTML = doc.getElementById('live-content').innerHTML;
-                    } catch (e) { console.error("Auto-refresh failed", e); }
+                        let newContent = doc.getElementById('live-content');
+                        if (newContent) {
+                            document.getElementById('live-content').innerHTML = newContent.innerHTML;
+                            console.log("Successfully swapped HTML content!");
+                            addSyncIndicator(); // Update the visual clock
+                        } else {
+                            console.error("Could not find 'live-content' in the downloaded file.");
+                        }
+                    } catch (e) { 
+                        console.error("Auto-refresh completely failed:", e); 
+                    }
                 }, 60000); // 60000 milliseconds = 1 minute
+            }
+
+            // This creates a small green clock to prove the JS is working
+            function addSyncIndicator() {
+                let existing = document.getElementById('frontend-sync');
+                if (existing) { existing.remove(); } // Remove old one
+
+                let syncDiv = document.createElement('div');
+                syncDiv.id = 'frontend-sync';
+                syncDiv.style.fontSize = '0.9em';
+                syncDiv.style.color = '#2ecc71'; 
+                syncDiv.style.fontWeight = 'bold';
+                syncDiv.style.marginTop = '5px';
+                syncDiv.innerText = "⚡ Browser successfully checked server at: " + new Date().toLocaleTimeString();
+                
+                // Stick it right below the main Last Updated timestamp
+                let timestampDiv = document.querySelector('.timestamp');
+                if (timestampDiv) {
+                    timestampDiv.parentNode.insertBefore(syncDiv, timestampDiv.nextSibling);
+                }
             }
 
             // Table Sorting Logic
