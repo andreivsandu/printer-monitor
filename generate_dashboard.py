@@ -577,18 +577,20 @@ Westmount, QC H3Z 3C1`;
                 localStorage.setItem('theme', isDark ? 'light' : 'dark');
             }
 
-            // Smooth Background Refresh
+            // Smooth Background Refresh (Checks every 1 minute)
             function startAutoRefresh() {
                 setInterval(async () => {
                     try {
-                        const response = await fetch(window.location.href, { cache: 'no-store' });
+                        // The ?t= timestamp completely blocks browser caching
+                        const url = window.location.pathname + "?t=" + new Date().getTime();
+                        const response = await fetch(url, { cache: 'no-store' });
                         const html = await response.text();
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
                         
                         document.getElementById('live-content').innerHTML = doc.getElementById('live-content').innerHTML;
                     } catch (e) { console.error("Auto-refresh failed", e); }
-                }, 300000); 
+                }, 60000); // 60000 milliseconds = 1 minute
             }
 
             // Table Sorting Logic
