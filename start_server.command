@@ -14,11 +14,11 @@ echo "👉 Link for your browser/Notion: http://localhost:8000/runtime/printer_d
 echo "⚠️  DO NOT CLOSE THIS WINDOW. MINIMIZE IT."
 echo "======================================================="
 
-# 3. Infinite loop: Update data, wait 15 minutes, repeat.
+# 3. Infinite loop: Update data, wait 5 minutes, repeat.
 while true; do
     echo "[$(date)] Fetching new printer data..."
     /usr/bin/python3 generate_dashboard.py
     
-    echo "[$(date)] Update complete. Waiting 15 minutes..."
-    sleep 900
+    echo "[$(date)] Update complete. Waiting 5 minutes..."
+    sleep 300
 done

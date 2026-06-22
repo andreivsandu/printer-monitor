@@ -849,13 +849,15 @@ def main():
             else:
                 alerts_data = get_printer_alerts(ip, community)
 
-                # --- FETCH ALL SUPPLIES BEFORE CHECKING FOR CRITICAL ALERTS ---
+                # --- SPEED FIX: DO NOT ASK B&W PRINTERS FOR COLOR ---
+                model_parts = PART_NUMBERS.get(shopping_model_name, {})
+                
                 b = get_supply_percent(ip, community, original_model, "black")
-                c = get_supply_percent(ip, community, original_model, "cyan")
-                m = get_supply_percent(ip, community, original_model, "magenta")
-                y = get_supply_percent(ip, community, original_model, "yellow")
+                c = "-" if model_parts.get("Cyan") == "N/A" else get_supply_percent(ip, community, original_model, "cyan")
+                m = "-" if model_parts.get("Magenta") == "N/A" else get_supply_percent(ip, community, original_model, "magenta")
+                y = "-" if model_parts.get("Yellow") == "N/A" else get_supply_percent(ip, community, original_model, "yellow")
                 fuser = get_supply_percent(ip, community, original_model, "fuser")
-                waste_raw = get_supply_percent(ip, community, original_model, "waste")
+                waste_raw = "-" if model_parts.get("Waste") == "N/A" else get_supply_percent(ip, community, original_model, "waste")
                 
                 # --- XEROX OID FIX ---
                 if "Xerox" in original_model or "AltaLink" in original_model:
