@@ -581,7 +581,7 @@ Westmount, QC H3Z 3C1`;
             function startAutoRefresh() {
                 setInterval(async () => {
                     try {
-                        const response = await fetch(window.location.href);
+                        const response = await fetch(window.location.href, { cache: 'no-store' });
                         const html = await response.text();
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
