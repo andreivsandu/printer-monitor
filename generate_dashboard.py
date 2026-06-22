@@ -842,18 +842,31 @@ def main():
             online = "YES" if dev_stat else "NO"
             state = map_status(dev_stat)
             
-            alerts_data = get_printer_alerts(ip, community)
+            # --- SMART BYPASS FOR OFFLINE PRINTERS ---
+            if online == "NO":
+                alerts_data = {"text": "Printer Offline or Unreachable", "is_critical": True, "is_warning": False}
+                b = c = m = y = fuser = waste_raw = waste_display = "-"
+            else:
+                alerts_data = get_printer_alerts(ip, community)
 
-            # --- FETCH ALL SUPPLIES BEFORE CHECKING FOR CRITICAL ALERTS ---
-            b = get_supply_percent(ip, community, original_model, "black")
-            c = get_supply_percent(ip, community, original_model, "cyan")
-            m = get_supply_percent(ip, community, original_model, "magenta")
-            y = get_supply_percent(ip, community, original_model, "yellow")
-            fuser = get_supply_percent(ip, community, original_model, "fuser")
-            waste_raw = get_supply_percent(ip, community, original_model, "waste")
-            # --- XEROX OID FIX ---
-            if "Xerox" in original_model or "AltaLink" in original_model:
-                waste_raw = -3  # Force to OK. The generic OID reads Drums on Xerox!
+                # --- FETCH ALL SUPPLIES BEFORE CHECKING FOR CRITICAL ALERTS ---
+                b = get_supply_percent(ip, community, original_model, "black")
+                c = get_supply_percent(ip, community, original_model, "cyan")
+                m = get_supply_percent(ip, community, original_model, "magenta")
+                y = get_supply_percent(ip, community, original_model, "yellow")
+                fuser = get_supply_percent(ip, community, original_model, "fuser")
+                waste_raw = get_supply_percent(ip, community, original_model, "waste")
+                
+                # --- XEROX OID FIX ---
+                if "Xerox" in original_model or "AltaLink" in original_model:
+                    waste_raw = -3  # Force to OK. The generic OID reads Drums on Xerox!
+
+                waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
+                if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
+                    waste_raw = "REPLACE"
+                    waste_display = "REPLACE"
+                else:
+                    waste_display = format_waste(waste_raw)
 
             # --- THE FIX: Failsafe now flags both 0 AND -2 (Error) ---
             failsafe_errors = []
