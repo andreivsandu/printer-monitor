@@ -798,7 +798,7 @@ Westmount, QC H3Z 3C1`;
         return val
 
     for p in printer_data:
-        status_class = "online" if p['online'] == "YES" else "offline"
+        status_class = "offline" if p['online'] == "NO" or p['state'] == "DOWN" else "online"
         
         alerts_data = p['alerts']
         alerts_td_content = "-"
