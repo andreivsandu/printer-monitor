@@ -928,9 +928,12 @@ def main():
                 
                 # Check if it's a new broken printer, OR if the error message has changed!
                 if name not in alert_state or alert_state[name] != alerts_data['text']:
-                    logger.info("New or updated critical alert detected for %s; sending notification", name)
-                    send_critical_email(name, ip, alerts_data['text'])
-                    alert_state[name] = alerts_data['text'] # Save the EXACT error text
+                    # ONLY send the email if the error is NOT our custom offline message
+                    if alerts_data['text'] != "Printer Offline or Unreachable":
+                        logger.info("New or updated critical alert detected for %s; sending notification", name)
+                        send_critical_email(name, ip, alerts_data['text'])
+                    
+                    alert_state[name] = alerts_data['text'] # Save the EXACT error text so it doesn't loop
                 else:
                     logger.debug("Critical alert for %s already recorded in alert state", name)
                 
