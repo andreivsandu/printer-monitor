@@ -20,6 +20,8 @@ CSV_FILE = os.environ.get("PRINTER_MONITOR_CSV_FILE", f"{BASE_PATH}/printers.csv
 RUNTIME_DIR = os.environ.get("PRINTER_MONITOR_RUNTIME_DIR", f"{BASE_PATH}/runtime")
 HTML_FILE = os.environ.get("PRINTER_MONITOR_HTML_FILE", f"{RUNTIME_DIR}/printer_dashboard.html")
 STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{RUNTIME_DIR}/alert_state.json") 
+INVENTORY_FILE = os.environ.get("PRINTER_MONITOR_INVENTORY_FILE", f"{RUNTIME_DIR}/inventory.json")
+TONER_STATE_FILE = os.environ.get("PRINTER_MONITOR_TONER_STATE_FILE", f"{RUNTIME_DIR}/toner_state.json")
 DEFAULT_TIMEZONE_NAME = "America/Toronto"
 CONFIGURED_TIMEZONE_NAME = os.environ.get("PRINTER_MONITOR_TIMEZONE", os.environ.get("TZ", DEFAULT_TIMEZONE_NAME))
 LOG_LEVEL = getattr(logging, os.environ.get("PRINTER_MONITOR_LOG_LEVEL", "INFO").upper(), logging.INFO)
@@ -65,7 +67,6 @@ RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_R
 TONER_LOW_THRESHOLD = 5     
 WASTE_FULL_THRESHOLD = 95   
 
-# === SHOPPING LIST NICKNAMES ===
 # === SHOPPING LIST NICKNAMES ===
 SUPPLY_MAPPING = {
     "HP M554": "HP M554 / M555 Series",
@@ -228,10 +229,10 @@ def snmp_get(ip, community, oid):
     return value
 
 def run_snmp_command(ip, community, oid, version, command_type):
-    cmd = [f"/usr/bin/{command_type}", f"-v{version}", "-c", community, ip, oid]
+    cmd = [f"/usr/bin/{command_type}", f"-v{version}", "-c", community, "-t", "1", "-r", "0", ip, oid]
     try:
         logger.debug("Running %s against %s with SNMP v%s for oid %s", command_type, ip, version, oid)
-        result = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=2).decode(errors='ignore')
+        result = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=1.5).decode(errors='ignore')
         
         if command_type == "snmpget":
             value = result.split(":")[-1].strip()
@@ -435,10 +436,47 @@ def get_printer_alerts(ip, community):
     final_text = " | ".join(valid_alerts_found)
     return {"text": final_text, "is_critical": is_critical, "is_warning": is_warning}
 
+
+# =========================
+# INVENTORY MATH LOGIC
+# =========================
+def load_inventory():
+    if os.path.exists(INVENTORY_FILE):
+        try:
+            with open(INVENTORY_FILE, "r") as f:
+                return json.load(f)
+        except Exception: pass
+    # If file doesn't exist, build a blank one based on your models
+    inv = {}
+    for model in PART_NUMBERS:
+        inv[model] = {"Black": 0, "Cyan": 0, "Magenta": 0, "Yellow": 0, "Fuser": 0, "Waste": 0}
+    with open(INVENTORY_FILE, "w") as f:
+        json.dump(inv, f, indent=4)
+    return inv
+
+def save_inventory(inv):
+    with open(INVENTORY_FILE, "w") as f:
+        json.dump(inv, f, indent=4)
+
+def is_swap(prev_val, curr_val, is_waste=False):
+    if curr_val == "-" or prev_val == "-": return False
+    try:
+        c = int(curr_val)
+        p = int(prev_val) if prev_val not in ["REPLACE", "OK", "?"] else (99 if prev_val == "REPLACE" else 0)
+    except (ValueError, TypeError):
+        return False
+        
+    if is_waste:
+        # Waste boxes count UP. A swap is when it drops from 80%+ down to <20%
+        return (p >= 80 or p == -2) and c <= 20
+    else:
+        # Toners count DOWN. A swap is when it jumps from <15% up to 80%+
+        return (p <= 15 or p == -2) and c >= 80
+
 # =========================
 # HTML GENERATOR
 # =========================
-def generate_html(printer_data, shopping_counts, timestamp):
+def generate_html(printer_data, shopping_counts, inventory, timestamp):
     
     html = """
     <!DOCTYPE html>
@@ -699,12 +737,12 @@ Westmount, QC H3Z 3C1`;
                 <table class="shopping-table" id="shopTable">
                     <tr>
                         <th onclick="sortTable('shopTable', 0)">Model / Group ↕</th>
-                        <th onclick="sortTable('shopTable', 1)">Black Qty ↕</th>
-                        <th onclick="sortTable('shopTable', 2)">Cyan Qty ↕</th>
-                        <th onclick="sortTable('shopTable', 3)">Magenta Qty ↕</th>
-                        <th onclick="sortTable('shopTable', 4)">Yellow Qty ↕</th>
-                        <th onclick="sortTable('shopTable', 5)">Fuser Qty ↕</th>
-                        <th onclick="sortTable('shopTable', 6)">Waste Qty ↕</th>
+                        <th onclick="sortTable('shopTable', 1)">Black<br><small>(Need / Have)</small> ↕</th>
+                        <th onclick="sortTable('shopTable', 2)">Cyan<br><small>(Need / Have)</small> ↕</th>
+                        <th onclick="sortTable('shopTable', 3)">Magenta<br><small>(Need / Have)</small> ↕</th>
+                        <th onclick="sortTable('shopTable', 4)">Yellow<br><small>(Need / Have)</small> ↕</th>
+                        <th onclick="sortTable('shopTable', 5)">Fuser<br><small>(Need / Have)</small> ↕</th>
+                        <th onclick="sortTable('shopTable', 6)">Waste<br><small>(Need / Have)</small> ↕</th>
                         <th>Parts to Order</th>
                         <th>Order Here</th>
                     </tr>
@@ -713,42 +751,42 @@ Westmount, QC H3Z 3C1`;
     sorted_models = sorted(shopping_counts.keys(), key=lambda x: x.lower())
     for model in sorted_models:
         counts = shopping_counts[model]
-        if sum(counts.values()) > 0:
-            
-            parts_to_order = []
-            model_parts = PART_NUMBERS.get(model, {})
-            
-            for item in ["Black", "Cyan", "Magenta", "Yellow", "Fuser", "Waste"]:
-                if counts[item] > 0:
-                    part_no = model_parts.get(item, "?")
-                    parts_to_order.append(f"{item}: {part_no}")
-            
-            parts_str = "<br>".join(parts_to_order) if parts_to_order else "None needed yet"
-            
-            # Smart Order Links
-            order_link = ""
-            if "Galactica" in model:
-                order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
-            elif "Orion" in model:
-                order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Orion', '3TQ0 1854'); return false;\">📧 Email Canon</a>"
-            elif "Mercury" in model:
-                order_link = f"<a href='#' onclick=\"sendOrderEmail('printersplus', 'Mercury', 'Xerox AltaLink C8145'); return false;\">📧 Email PrintersPlus</a>"
-            else:
-                order_link = "<a href='https://www.printersplus.net' target='_blank'>🌐 printersplus.net</a>"
-            
-            html += f"""
-                    <tr>
-                        <td><strong>{model}</strong></td>
-                        <td>{counts['Black']}</td>
-                        <td>{counts['Cyan']}</td>
-                        <td>{counts['Magenta']}</td>
-                        <td>{counts['Yellow']}</td>
-                        <td>{counts['Fuser']}</td>
-                        <td>{counts['Waste']}</td>
-                        <td>{parts_str}</td>
-                        <td>{order_link}</td>
-                    </tr>
-            """
+        inv_counts = inventory.get(model, {})
+        
+        parts_to_order = []
+        model_parts = PART_NUMBERS.get(model, {})
+        
+        for item in ["Black", "Cyan", "Magenta", "Yellow", "Fuser", "Waste"]:
+            if counts[item] > 0:
+                part_no = model_parts.get(item, "?")
+                parts_to_order.append(f"{item}: {part_no}")
+        
+        parts_str = "<br>".join(parts_to_order) if parts_to_order else "None needed yet"
+        
+        # Smart Order Links
+        order_link = ""
+        if "Galactica" in model:
+            order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
+        elif "Orion" in model:
+            order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Orion', '3TQ0 1854'); return false;\">📧 Email Canon</a>"
+        elif "Mercury" in model:
+            order_link = f"<a href='#' onclick=\"sendOrderEmail('printersplus', 'Mercury', 'Xerox AltaLink C8145'); return false;\">📧 Email PrintersPlus</a>"
+        else:
+            order_link = "<a href='https://www.printersplus.net' target='_blank'>🌐 printersplus.net</a>"
+        
+        html += f"""
+                <tr>
+                    <td><strong>{model}</strong></td>
+                    <td>{counts['Black']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Black', 0)}</span></strong></td>
+                    <td>{counts['Cyan']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Cyan', 0)}</span></strong></td>
+                    <td>{counts['Magenta']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Magenta', 0)}</span></strong></td>
+                    <td>{counts['Yellow']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Yellow', 0)}</span></strong></td>
+                    <td>{counts['Fuser']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Fuser', 0)}</span></strong></td>
+                    <td>{counts['Waste']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Waste', 0)}</span></strong></td>
+                    <td>{parts_str}</td>
+                    <td>{order_link}</td>
+                </tr>
+        """
 
     html += """
                 </table>
@@ -849,6 +887,16 @@ def main():
     
     shopping_counts = {}
     
+    inventory = load_inventory()
+    
+    toner_state = {}
+    if os.path.exists(TONER_STATE_FILE):
+        try:
+            with open(TONER_STATE_FILE, "r") as f:
+                toner_state = json.load(f)
+        except Exception: pass
+    new_toner_state = {}
+    
     alert_state = {}
     if os.path.exists(STATE_FILE):
         try:
@@ -908,6 +956,24 @@ def main():
                     waste_display = "REPLACE"
                 else:
                     waste_display = format_waste(waste_raw)
+
+            # --- AUTOMATIC INVENTORY DEDUCTION ---
+            if online == "YES":
+                curr_levels = {"Black": b, "Cyan": c, "Magenta": m, "Yellow": y, "Fuser": fuser, "Waste": waste_raw}
+                new_toner_state[name] = curr_levels
+                
+                prev_levels = toner_state.get(name, {})
+                for color_name, curr_val in curr_levels.items():
+                    prev_val = prev_levels.get(color_name, "-")
+                    
+                    if is_swap(prev_val, curr_val, is_waste=(color_name=="Waste")):
+                        if shopping_model_name in inventory:
+                            current_stock = inventory[shopping_model_name].get(color_name, 0)
+                            inventory[shopping_model_name][color_name] = max(0, current_stock - 1)
+                            logger.info(f"🔄 SWAP DETECTED: {color_name} on {name}. Deducted 1 from inventory.")
+            else:
+                new_toner_state[name] = toner_state.get(name, {})
+
 
             # --- THE FIX: Failsafe now flags both 0 AND -2 (Error) ---
             failsafe_errors = []
@@ -981,12 +1047,16 @@ def main():
     with open(STATE_FILE, "w") as f:
         json.dump(alert_state, f)
     logger.debug("Wrote %s alert-state entries to %s", len(alert_state), STATE_FILE)
+    
+    save_inventory(inventory)
+    with open(TONER_STATE_FILE, "w") as f:
+        json.dump(new_toner_state, f)
 
     printer_data.sort(key=lambda x: x['name'].lower())
 
     timestamp = format_display_timestamp(get_local_now())
     
-    generate_html(printer_data, shopping_counts, timestamp)
+    generate_html(printer_data, shopping_counts, inventory, timestamp)
     logger.info(
         "Dashboard generated successfully at %s with %s printers and %s active critical alerts",
         HTML_FILE,
