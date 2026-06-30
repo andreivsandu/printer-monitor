@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Printer Dashboard</title>
+    <style>
+        /* CSS Variables for Dark/Light Mode */
+        :root {
+            --bg-color: #f4f7f6; --text-color: #333; --table-bg: #fff; --table-border: #eee;
+            --th-bg: #34495e; --th-text: #fff; --row-even: #f9fbfc; --row-hover: #f1f1f1;
+            --link-color: #2980b9; --link-hover: #1abc9c; --shop-th: #2980b9; --bar-bg: #e0e0e0;
+            --header-border: #3498db; --toner-black: #34495e; --toner-cyan: #00bcd4;
+            --toner-magenta: #e91e63; --toner-yellow: #f1c40f; --toner-fuser: #95a5a6;
+        }
+        [data-theme="dark"] {
+            --bg-color: #121212; --text-color: #e0e0e0; --table-bg: #1e1e1e; --table-border: #333;
+            --th-bg: #1f2b38; --th-text: #e0e0e0; --row-even: #252525; --row-hover: #2c2c2c;
+            --link-color: #64b5f6; --link-hover: #81c784; --shop-th: #154360; --bar-bg: #444;
+            --header-border: #64b5f6; --toner-black: #9aa7b1; --toner-cyan: #26c6da;
+            --toner-magenta: #ec407a; --toner-yellow: #ffee58; --toner-fuser: #7f8c8d;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        .container { max-width: 1500px; margin: auto; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--header-border); padding-bottom: 10px; margin-bottom: 20px; }
+        h1 { color: var(--header-border); margin: 0; }
+        h2 { color: var(--link-color); margin-top: 40px; }
+        .timestamp { color: #7f8c8d; font-size: 0.9em; font-style: italic; }
+        
+        table { width: 100%; border-collapse: collapse; background: var(--table-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--table-border); }
+        th { background-color: var(--th-bg); color: var(--th-text); text-transform: uppercase; font-size: 0.85em; letter-spacing: 0.5px; cursor: pointer; user-select: none; transition: 0.2s; }
+        th:hover { background-color: var(--link-hover); color: #fff; }
+        tr:nth-child(even) { background-color: var(--row-even); }
+        tr:hover { background-color: var(--row-hover); }
+        
+        a { color: var(--link-color); text-decoration: none; font-weight: bold; }
+        a:hover { text-decoration: underline; color: var(--link-hover); }
+
+        .offline { color: #e74c3c; font-weight: bold; }
+        .online { color: #2ecc71; font-weight: bold; }
+        .shopping-table th { background-color: var(--shop-th); }
+        
+        .alert-critical { background-color: #ffcccc; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
+        .alert-warning { background-color: #ffe0b2; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
+        
+        /* Theme Toggle Button */
+        .theme-toggle { background: var(--th-bg); color: var(--th-text); border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .theme-toggle:hover { background: var(--link-hover); color: #fff;}
+        
+        /* Progress Bars */
+        .progress-container { width: 100%; min-width: 60px; background-color: var(--bar-bg); border-radius: 4px; position: relative; height: 22px; display: flex; align-items: center; overflow: hidden; border: 1px solid rgba(0,0,0,0.1);}
+        .progress-bar { height: 100%; transition: width 0.5s ease; }
+        .progress-text { position: absolute; width: 100%; text-align: center; font-size: 0.85em; font-weight: 700; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9); pointer-events: none;}
+    </style>
+    
+    <script>
+        // --- SMART EMAIL SIGNATURE LOGIC ---
+        function resetName() {
+            localStorage.removeItem('orderName');
+            alert("Signature name has been reset! You will be prompted for your name the next time you click to order.");
+        }
+
+        function sendOrderEmail(vendor, printerName, serial) {
+            let userName = localStorage.getItem('orderName');
+            if (!userName) {
+                userName = prompt("First time setup: What is your name? (This will be used for the email signature)");
+                if (userName && userName.trim() !== "") {
+                    localStorage.setItem('orderName', userName.trim());
+                } else {
+                    userName = "IT Support"; 
+                }
+            }
+
+            let subject = "Toner Order - " + serial;
+            let printerDesc = printerName === 'Mercury' ? serial : "serial number " + serial;
+            
+            let fullMessage = `Dear sir/madam,\n\nOur printer (${printerDesc}) has run out of toner. We need a full set of colors and two blacks.\n\n--\n${userName}\nIT Support Team\nT: (514) 861-4367\n\nGOLDWATER DROIT\n3500 ouest boul. de Maisonneuve Blvd. West\nSuite 2310, Office Tower 2\nWestmount, QC H3Z 3C1`;
+
+            let fullBody = encodeURIComponent(fullMessage);
+            let encodedSubject = encodeURIComponent(subject);
+            let emailAddress = vendor === 'canon' ? 'canonsupplies@canada.canon.com' : 'cmorrison@printersplus.net';
+
+            window.location.href = "mailto:" + emailAddress + "?subject=" + encodedSubject + "&body=" + fullBody;
+        }
+
+        // Dark Mode Logic
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        function toggleDark() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        }
+
+        // Smooth Background Refresh
+        function startAutoRefresh() {
+            addSyncIndicator(); 
+            setInterval(async () => {
+                try {
+                    const url = window.location.pathname + "?t=" + new Date().getTime();
+                    const response = await fetch(url, { cache: 'no-store' });
+                    if (!response.ok) throw new Error("Server returned status: " + response.status);
+                    
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    let newContent = doc.getElementById('live-content');
+                    if (newContent) {
+                        document.getElementById('live-content').innerHTML = newContent.innerHTML;
+                        addSyncIndicator(); 
+                    }
+                } catch (e) { console.error("Auto-refresh failed:", e); }
+            }, 60000); 
+        }
+
+        function addSyncIndicator() {
+            let existing = document.getElementById('frontend-sync');
+            if (existing) existing.remove();
+            let syncDiv = document.createElement('div');
+            syncDiv.id = 'frontend-sync';
+            syncDiv.style.fontSize = '0.9em';
+            syncDiv.style.color = '#2ecc71'; 
+            syncDiv.style.fontWeight = 'bold';
+            syncDiv.style.marginTop = '5px';
+            syncDiv.innerText = "⚡ Browser successfully checked server at: " + new Date().toLocaleTimeString();
+            
+            let timestampDiv = document.querySelector('.timestamp');
+            if (timestampDiv) timestampDiv.parentNode.insertBefore(syncDiv, timestampDiv.nextSibling);
+        }
+
+        // Table Sorting Logic
+        function sortTable(tableId, colIndex) {
+            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+            table = document.getElementById(tableId);
+            switching = true; dir = "asc"; 
+            while (switching) {
+                switching = false; rows = table.rows;
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[colIndex];
+                    y = rows[i + 1].getElementsByTagName("TD")[colIndex];
+                    let valX = x.innerText || x.textContent;
+                    let valY = y.innerText || y.textContent;
+                    
+                    let numX = parseFloat(valX.replace(/[^0-9.-]/g, ''));
+                    let numY = parseFloat(valY.replace(/[^0-9.-]/g, ''));
+                    if (!isNaN(numX) && !isNaN(numY) && valX.includes("%")) { valX = numX; valY = numY; } 
+                    else { valX = valX.toLowerCase(); valY = valY.toLowerCase(); }
+
+                    if (dir == "asc") { if (valX > valY) { shouldSwitch = true; break; } } 
+                    else if (dir == "desc") { if (valX < valY) { shouldSwitch = true; break; } }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true; switchcount ++;      
+                } else {
+                    if (switchcount == 0 && dir == "asc") { dir = "desc"; switching = true; }
+                }
+            }
+        }
+        window.onload = startAutoRefresh;
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <h1>🖨️ Office Printer Dashboard</h1>
+            <div>
+                <button class="theme-toggle" onclick="resetName()" style="margin-right: 10px;">👤 Reset Signature Name</button>
+                <button class="theme-toggle" onclick="toggleDark()">🌙 / ☀️ Toggle Theme</button>
+            </div>
+        </div>
+
+        <div id="live-content">
+            <div class="timestamp">Last Updated: {{ timestamp }}</div>
+            
+            <h2>🛒 Shopping List</h2>
+            <table class="shopping-table" id="shopTable">
+                <tr>
+                    <th onclick="sortTable('shopTable', 0)">Model / Group ↕</th>
+                    <th onclick="sortTable('shopTable', 1)">Black<br><small>(Need / Have)</small> ↕</th>
+                    <th onclick="sortTable('shopTable', 2)">Cyan<br><small>(Need / Have)</small> ↕</th>
+                    <th onclick="sortTable('shopTable', 3)">Magenta<br><small>(Need / Have)</small> ↕</th>
+                    <th onclick="sortTable('shopTable', 4)">Yellow<br><small>(Need / Have)</small> ↕</th>
+                    <th onclick="sortTable('shopTable', 5)">Fuser<br><small>(Need / Have)</small> ↕</th>
+                    <th onclick="sortTable('shopTable', 6)">Waste<br><small>(Need / Have)</small> ↕</th>
+                    <th>Parts to Order</th>
+                    <th>Order Here</th>
+                </tr>
+                {% for row in shopping_rows %}
+                <tr>
+                    <td><strong>{{ row.model }}</strong></td>
+                    <td>{{ row.inv_black | safe }}</td>
+                    <td>{{ row.inv_cyan | safe }}</td>
+                    <td>{{ row.inv_magenta | safe }}</td>
+                    <td>{{ row.inv_yellow | safe }}</td>
+                    <td>{{ row.inv_fuser | safe }}</td>
+                    <td>{{ row.inv_waste | safe }}</td>
+                    <td>{{ row.parts_str | safe }}</td>
+                    <td>{{ row.order_link | safe }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            
+            <h2>📊 Live Printer Status</h2>
+            <table id="statusTable">
+                <tr>
+                    <th onclick="sortTable('statusTable', 0)">Name ↕</th>
+                    <th onclick="sortTable('statusTable', 1)">IP Address ↕</th>
+                    <th onclick="sortTable('statusTable', 2)">Model ↕</th>
+                    <th onclick="sortTable('statusTable', 3)">Status ↕</th>
+                    <th onclick="sortTable('statusTable', 4)">Current Alerts ↕</th>
+                    <th onclick="sortTable('statusTable', 5)">Black ↕</th>
+                    <th onclick="sortTable('statusTable', 6)">Cyan ↕</th>
+                    <th onclick="sortTable('statusTable', 7)">Magenta ↕</th>
+                    <th onclick="sortTable('statusTable', 8)">Yellow ↕</th>
+                    <th onclick="sortTable('statusTable', 9)">Fuser ↕</th>
+                    <th onclick="sortTable('statusTable', 10)">Waste ↕</th>
+                </tr>
+                {% for p in printer_data %}
+                <tr>
+                    <td><strong><a href="http://{{ p.ip }}" target="_blank">{{ p.name }}</a></strong></td>
+                    <td>{{ p.ip }}</td>
+                    <td>{{ p.model }}</td>
+                    <td class="{{ p.status_class }}">{{ p.state }}</td>
+                    <td><span class="{{ p.alert_class }}">{{ p.alerts.text }}</span></td>
+                    <td>{{ p.html_b | safe }}</td>
+                    <td>{{ p.html_c | safe }}</td>
+                    <td>{{ p.html_m | safe }}</td>
+                    <td>{{ p.html_y | safe }}</td>
+                    <td>{{ p.html_fuser | safe }}</td>
+                    <td>{{ p.html_waste | safe }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div> 
+    </div>
+</body>
+</html>
