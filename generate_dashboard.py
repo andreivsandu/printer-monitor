@@ -466,12 +466,16 @@ def is_swap(prev_val, curr_val, is_waste=False):
     except (ValueError, TypeError):
         return False
         
+    # FIX: Ignore -2 (Unknown) and -3 (Xerox OK) so they don't trigger false swaps
+    if c in [-2, -3] or p in [-2, -3]:
+        return False
+        
     if is_waste:
         # Waste boxes count UP. A swap is when it drops from 80%+ down to <20%
-        return (p >= 80 or p == -2) and c <= 20
+        return p >= 80 and c <= 20
     else:
-        # Toners count DOWN. A swap is when it jumps from <15% up to 80%+
-        return (p <= 15 or p == -2) and c >= 80
+        # Toners count DOWN. A swap is when it jumps from <15% up to 95%+
+        return p <= 15 and c >= 95
 
 # =========================
 # HTML GENERATOR
@@ -748,6 +752,16 @@ Westmount, QC H3Z 3C1`;
                     </tr>
     """
 
+    def get_inv_display(need, have):
+        if have > need:
+            color = "#2ecc71"  # Green
+        elif have == need:
+            color = "#f39c12"  # Yellow
+        else:
+            color = "#e74c3c"  # Red
+            
+        return f"{need} / <strong><span style='color:{color}'>{have}</span></strong>"
+        
     sorted_models = sorted(shopping_counts.keys(), key=lambda x: x.lower())
     for model in sorted_models:
         counts = shopping_counts[model]
@@ -777,12 +791,12 @@ Westmount, QC H3Z 3C1`;
         html += f"""
                 <tr>
                     <td><strong>{model}</strong></td>
-                    <td>{counts['Black']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Black', 0)}</span></strong></td>
-                    <td>{counts['Cyan']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Cyan', 0)}</span></strong></td>
-                    <td>{counts['Magenta']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Magenta', 0)}</span></strong></td>
-                    <td>{counts['Yellow']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Yellow', 0)}</span></strong></td>
-                    <td>{counts['Fuser']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Fuser', 0)}</span></strong></td>
-                    <td>{counts['Waste']} / <strong><span style="color:var(--link-hover)">{inv_counts.get('Waste', 0)}</span></strong></td>
+                    <td>{get_inv_display(counts['Black'], inv_counts.get('Black', 0))}</td>
+                    <td>{get_inv_display(counts['Cyan'], inv_counts.get('Cyan', 0))}</td>
+                    <td>{get_inv_display(counts['Magenta'], inv_counts.get('Magenta', 0))}</td>
+                    <td>{get_inv_display(counts['Yellow'], inv_counts.get('Yellow', 0))}</td>
+                    <td>{get_inv_display(counts['Fuser'], inv_counts.get('Fuser', 0))}</td>
+                    <td>{get_inv_display(counts['Waste'], inv_counts.get('Waste', 0))}</td>
                     <td>{parts_str}</td>
                     <td>{order_link}</td>
                 </tr>
