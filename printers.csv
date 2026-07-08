@@ -1,5 +1,5 @@
 name,IP,community,row,model
-Galactica,10.20.0.249,public,2,Canon C5860
+Galactica,10.20.0.249,public,2,Canon C5170
 Exchequer,10.20.0.229,public,3,HP 2400
 Dr. Zaius,10.20.0.227,public,4,HP Color LaserJet 4525
 Dr. Who,10.20.0.228,public,5,HP Color LaserJet 4525
@@ -43,3 +43,4 @@ Scylla,10.20.0.231,public,42,HP M651
 Valkyrie,10.20.0.230,public,43,HP M880z
 Orion,10.20.0.243,public,44,imageFORCE C7165
 Mercury,10.20.0.205,public,46,Xerox AltaLink C8145
+Pegasus,10.20.0.245,public,47,Canon C5170

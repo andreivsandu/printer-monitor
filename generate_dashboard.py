@@ -72,7 +72,7 @@ SUPPLY_MAPPING = {
     "HP M554": "HP M554 / M555 Series",
     "HP M555": "HP M554 / M555 Series",
     "HP LaserJet M402dn": "HP M402dn (Labelist)",
-    "Canon C5860": "Canon C5860 (Galactica)",
+    "Canon C5170": "Canon C5170 (Galactica)",
     "HP 2400": "HP 2400 (Exchequer)",
     "HP Color LaserJet 4525": "HP Color LaserJet 4525 (Dr. Zaius)",
     "HP Color LaserJet 4700": "HP Color LaserJet 4700 (RainbowAlliance)",
@@ -170,7 +170,7 @@ PART_NUMBERS = {
     "HP M402dn (Labelist)": {
         "Black": "CF226X", "Cyan": "N/A", "Magenta": "N/A", "Yellow": "N/A", "Fuser": "RM2-5399", "Waste": "N/A"
     },
-    "Canon C5860 (Galactica)": {
+    "Canon C5170 (Galactica)": {
         "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow", "Fuser": "Fuser", "Waste": "Waste"
     },
     "HP 2400 (Exchequer)": {
