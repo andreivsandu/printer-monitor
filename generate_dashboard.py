@@ -66,16 +66,6 @@ RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_R
 # === COMPANY POLICY ===
 TONER_LOW_THRESHOLD = 5
 
-# Waste SNMP values mean REMAINING CAPACITY: 100% = bin empty (great), 0% = bin full (replace).
-# Shopping triggers when remaining capacity drops to or below this value.
-WASTE_LOW_THRESHOLD = 10
-
-# These models report waste as FULLNESS (0% = empty, 100% = full) — the opposite of Canon.
-# Their raw SNMP value is inverted to remaining capacity before any further logic runs.
-WASTE_INVERTED_MODELS = {
-    "Xerox AltaLink C8145",  # Mercury: reports how full the bin is, not how much space remains
-}
-
 # === SHOPPING LIST NICKNAMES ===
 SUPPLY_MAPPING = {
     "HP M554": "HP M554 / M555 Series",
@@ -171,46 +161,46 @@ def ensure_parent_dir(path):
     if directory:
         os.makedirs(directory, exist_ok=True)
 
-# === EXACT PART NUMBERS CHEAT SHEET ===
+# === EXACT PART NUMBERS CHEAT SHEET (toner only — fuser/waste removed) ===
 PART_NUMBERS = {
     "HP M554 / M555 Series": {
-        "Black": "W2120X", "Cyan": "W2121X", "Magenta": "W2123X", "Yellow": "W2122X", "Fuser": "B5L35A", "Waste": "B5L37A"
+        "Black": "W2120X", "Cyan": "W2121X", "Magenta": "W2123X", "Yellow": "W2122X",
     },
     "HP M402dn (Labelist)": {
-        "Black": "CF226X", "Cyan": "N/A", "Magenta": "N/A", "Yellow": "N/A", "Fuser": "RM2-5399", "Waste": "N/A"
+        "Black": "CF226X", "Cyan": "N/A", "Magenta": "N/A", "Yellow": "N/A",
     },
     "Canon C5170 (Galactica)": {
-        "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow", "Fuser": "Fuser", "Waste": "Waste"
+        "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow",
     },
     "HP 2400 (Exchequer)": {
-        "Black": "Q6511X", "Cyan": "N/A", "Magenta": "N/A", "Yellow": "N/A", "Fuser": "RM1-1535", "Waste": "N/A"
+        "Black": "Q6511X", "Cyan": "N/A", "Magenta": "N/A", "Yellow": "N/A",
     },
     "HP Color LaserJet 4525 (Dr. Zaius)": {
-        "Black": "CE260X", "Cyan": "CE261A", "Magenta": "CE263A", "Yellow": "CE262A", "Fuser": "CE246A", "Waste": "CE265A"
+        "Black": "CE260X", "Cyan": "CE261A", "Magenta": "CE263A", "Yellow": "CE262A",
     },
     "HP Color LaserJet 4700 (RainbowAlliance)": {
-        "Black": "Q5950A", "Cyan": "Q5951A", "Magenta": "Q5953A", "Yellow": "Q5952A", "Fuser": "Q7502A", "Waste": "N/A"
+        "Black": "Q5950A", "Cyan": "Q5951A", "Magenta": "Q5953A", "Yellow": "Q5952A",
     },
     "HP Color LaserJet CM4540f (Konstantieva)": {
-        "Black": "CE264X", "Cyan": "CE261A", "Magenta": "CE263A", "Yellow": "CE262A", "Fuser": "CE246A", "Waste": "CE265A"
+        "Black": "CE264X", "Cyan": "CE261A", "Magenta": "CE263A", "Yellow": "CE262A",
     },
     "HP Color LaserJet M551": {
-        "Black": "CE400XC", "Cyan": "CE401AC", "Magenta": "CE403AC", "Yellow": "CE402AC", "Fuser": "TBD", "Waste": "TBD"
+        "Black": "CE400XC", "Cyan": "CE401AC", "Magenta": "CE403AC", "Yellow": "CE402AC",
     },
     "HP M553": {
-        "Black": "CF360XC", "Cyan": "CF361XC", "Magenta": "CF363XC", "Yellow": "CF362XC", "Fuser": "TBD", "Waste": "TBD"
+        "Black": "CF360XC", "Cyan": "CF361XC", "Magenta": "CF363XC", "Yellow": "CF362XC",
     },
     "HP M651": {
-        "Black": "CF330XC", "Cyan": "CF331AC", "Magenta": "CF333AC", "Yellow": "CF332AC", "Fuser": "TBD", "Waste": "TBD"
+        "Black": "CF330XC", "Cyan": "CF331AC", "Magenta": "CF333AC", "Yellow": "CF332AC",
     },
     "HP M880z (Valkrye)": {
-        "Black": "CF300A", "Cyan": "CF301A", "Magenta": "CF303A", "Yellow": "CF302A", "Fuser": "C1N54A", "Waste": "C1N58A"
+        "Black": "CF300A", "Cyan": "CF301A", "Magenta": "CF303A", "Yellow": "CF302A",
     },
     "Canon C7165 (Orion)": {
-        "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow", "Fuser": "Fuser", "Waste": "Waste"
+        "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow",
     },
     "Xerox C8145 (Mercury)": {
-        "Black": "006R01746", "Cyan": "006R01747", "Magenta": "006R01748", "Yellow": "006R01749", "Fuser": "TBD", "Waste": "008R13325"
+        "Black": "006R01746", "Cyan": "006R01747", "Magenta": "006R01748", "Yellow": "006R01749",
     }
 }
 
@@ -224,8 +214,6 @@ DEFAULT_OIDS = {
     "cyan":           "1.3.6.1.2.1.43.11.1.1.9.1.2",
     "magenta":        "1.3.6.1.2.1.43.11.1.1.9.1.3",
     "yellow":         "1.3.6.1.2.1.43.11.1.1.9.1.4",
-    "fuser":          "1.3.6.1.2.1.43.11.1.1.9.1.5", 
-    "waste":          "1.3.6.1.2.1.43.11.1.1.9.1.6",
 }
 
 MODEL_OIDS = {}
@@ -242,7 +230,6 @@ def run_snmp_command(ip, community, oid, version, command_type):
     try:
         logger.debug("Running %s against %s with SNMP v%s for oid %s", command_type, ip, version, oid)
         result = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=1.5).decode(errors='ignore')
-        
         if command_type == "snmpget":
             value = result.split(":")[-1].strip()
             if "(" in value and ")" in value:
@@ -263,16 +250,6 @@ def to_number(value):
     if value is None or value == "": return ""
     try: return int(value)
     except: return ""
-
-def format_waste(value):
-    # -2 = printer doesn't expose waste via SNMP (most HPs) — treat as OK.
-    # -3 = also unknown/unsupported — treat as OK.
-    # -1 = printer explicitly says "unknown" — show ?.
-    # Any other negative = unexpected, show ?.
-    if value in [-2, -3]: return "OK"
-    if value == -1: return "?"
-    if isinstance(value, int) and value < 0: return "?"
-    return value
 
 def map_status(value):
     return {"2": "RUNNING", "3": "WARNING", "5": "DOWN"}.get(value, "OFFLINE")
@@ -301,7 +278,6 @@ def send_critical_email(printer_name, ip_address, error_text):
 
     msg = EmailMessage()
     msg.set_content(f"CRITICAL PRINTER ALERT\n\nPrinter: {printer_name}\nIP Address: {ip_address}\nError: {error_text}\n\nPlease check the dashboard for more details or click here to access the printer UI: http://{ip_address}")
-
     msg['Subject'] = f"🚨 Printer Alert: {printer_name} requires attention"
     msg['From'] = SENDER_EMAIL
     msg['To'] = ", ".join(RECIPIENT_EMAILS)
@@ -378,7 +354,6 @@ def get_printer_alerts(ip, community):
     warning_keywords = ["low", "very low", "used supply", "open", "empty", "load", "paused", "cleaning", "tray", "error"]
 
     valid_alerts_found = []
-
     for line in raw_alerts.split("\n"):
         if "STRING:" in line:
             alert_text = line.split("STRING:")[-1].strip().strip('"')
@@ -427,7 +402,7 @@ def load_inventory():
         except Exception: pass
     inv = {}
     for model in PART_NUMBERS:
-        inv[model] = {"Black": 0, "Cyan": 0, "Magenta": 0, "Yellow": 0, "Fuser": 0, "Waste": 0}
+        inv[model] = {"Black": 0, "Cyan": 0, "Magenta": 0, "Yellow": 0}
     with open(INVENTORY_FILE, "w") as f:
         json.dump(inv, f, indent=4)
     return inv
@@ -436,23 +411,16 @@ def save_inventory(inv):
     with open(INVENTORY_FILE, "w") as f:
         json.dump(inv, f, indent=4)
 
-def is_swap(prev_val, curr_val, is_waste=False):
+def is_swap(prev_val, curr_val):
     if curr_val == "-" or prev_val == "-": return False
     try:
         c = int(curr_val)
-        p = int(prev_val) if prev_val not in ["REPLACE", "OK", "?"] else (99 if prev_val == "REPLACE" else 0)
+        p = int(prev_val) if prev_val not in ["REPLACE", "OK", "?"] else 0
     except (ValueError, TypeError):
         return False
-        
     if c < 0 or p < 0:
         return False
-        
-    if is_waste:
-        # Waste = remaining capacity (after inversion for Xerox).
-        # A swap (new empty bin) means remaining capacity jumps from near-0 back to near-100.
-        return p <= 20 and c >= 80
-    else:
-        return p <= 15 and c >= 95
+    return p <= 15 and c >= 95
 
 # =========================
 # HTML GENERATOR
@@ -485,7 +453,6 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
                 --toner-cyan: #00bcd4;
                 --toner-magenta: #e91e63;
                 --toner-yellow: #f1c40f;
-                --toner-fuser: #95a5a6;
             }
             [data-theme="dark"] {
                 --bg-color: #121212;
@@ -501,14 +468,13 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
                 --shop-th: #154360;
                 --bar-bg: #444;
                 --header-border: #64b5f6;
-                --toner-black: #9aa7b1; 
+                --toner-black: #9aa7b1;
                 --toner-cyan: #26c6da;
                 --toner-magenta: #ec407a;
                 --toner-yellow: #ffee58;
-                --toner-fuser: #7f8c8d;
             }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
-            .container { max-width: 1500px; margin: auto; }
+            .container { max-width: 1400px; margin: auto; }
             .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--header-border); padding-bottom: 10px; margin-bottom: 20px; }
             h1 { color: var(--header-border); margin: 0; }
             h2 { color: var(--link-color); margin-top: 40px; }
@@ -565,10 +531,8 @@ GOLDWATER DROIT
 Suite 2310, Office Tower 2
 Westmount, QC H3Z 3C1`;
 
-                let fullBody = encodeURIComponent(fullMessage);
-                let encodedSubject = encodeURIComponent(subject);
                 let emailAddress = vendor === 'canon' ? 'canonsupplies@canada.canon.com' : 'cmorrison@printersplus.net';
-                window.location.href = "mailto:" + emailAddress + "?subject=" + encodedSubject + "&body=" + fullBody;
+                window.location.href = "mailto:" + emailAddress + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(fullMessage);
             }
 
             if (localStorage.getItem('theme') === 'dark') {
@@ -581,82 +545,56 @@ Westmount, QC H3Z 3C1`;
             }
 
             function startAutoRefresh() {
-                console.log("Auto-refresh timer started!");
                 addSyncIndicator();
                 setInterval(async () => {
                     try {
                         const url = window.location.pathname + "?t=" + new Date().getTime();
                         const response = await fetch(url, { cache: 'no-store' });
-                        if (!response.ok) { throw new Error("Server returned status: " + response.status); }
+                        if (!response.ok) throw new Error("Status: " + response.status);
                         const html = await response.text();
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
-                        let newContent = doc.getElementById('live-content');
+                        const newContent = doc.getElementById('live-content');
                         if (newContent) {
                             document.getElementById('live-content').innerHTML = newContent.innerHTML;
                             addSyncIndicator();
-                        } else {
-                            console.error("Could not find 'live-content' in the downloaded file.");
                         }
-                    } catch (e) { 
-                        console.error("Auto-refresh completely failed:", e); 
-                    }
+                    } catch (e) { console.error("Auto-refresh failed:", e); }
                 }, 60000);
             }
 
             function addSyncIndicator() {
-                let existing = document.getElementById('frontend-sync');
-                if (existing) { existing.remove(); }
-                let syncDiv = document.createElement('div');
-                syncDiv.id = 'frontend-sync';
-                syncDiv.style.fontSize = '0.9em';
-                syncDiv.style.color = '#2ecc71'; 
-                syncDiv.style.fontWeight = 'bold';
-                syncDiv.style.marginTop = '5px';
-                syncDiv.innerText = "⚡ Browser successfully checked server at: " + new Date().toLocaleTimeString();
-                let timestampDiv = document.querySelector('.timestamp');
-                if (timestampDiv) {
-                    timestampDiv.parentNode.insertBefore(syncDiv, timestampDiv.nextSibling);
-                }
+                const existing = document.getElementById('frontend-sync');
+                if (existing) existing.remove();
+                const div = document.createElement('div');
+                div.id = 'frontend-sync';
+                div.style.cssText = 'font-size:0.9em;color:#2ecc71;font-weight:bold;margin-top:5px;';
+                div.innerText = "⚡ Browser successfully checked server at: " + new Date().toLocaleTimeString();
+                const ts = document.querySelector('.timestamp');
+                if (ts) ts.parentNode.insertBefore(div, ts.nextSibling);
             }
 
             function sortTable(tableId, colIndex) {
-                var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-                table = document.getElementById(tableId);
-                switching = true;
-                dir = "asc"; 
+                var table = document.getElementById(tableId), switching = true, dir = "asc", switchcount = 0;
                 while (switching) {
                     switching = false;
-                    rows = table.rows;
-                    for (i = 1; i < (rows.length - 1); i++) {
-                        shouldSwitch = false;
-                        x = rows[i].getElementsByTagName("TD")[colIndex];
-                        y = rows[i + 1].getElementsByTagName("TD")[colIndex];
-                        let valX = x.innerText || x.textContent;
-                        let valY = y.innerText || y.textContent;
-                        let numX = parseFloat(valX.replace(/[^0-9.-]/g, ''));
-                        let numY = parseFloat(valY.replace(/[^0-9.-]/g, ''));
-                        if (!isNaN(numX) && !isNaN(numY) && valX.includes("%")) {
-                            valX = numX; valY = numY;
-                        } else {
-                            valX = valX.toLowerCase(); valY = valY.toLowerCase();
-                        }
-                        if (dir == "asc") {
-                            if (valX > valY) { shouldSwitch = true; break; }
-                        } else if (dir == "desc") {
-                            if (valX < valY) { shouldSwitch = true; break; }
+                    var rows = table.rows;
+                    for (var i = 1; i < rows.length - 1; i++) {
+                        var x = rows[i].getElementsByTagName("TD")[colIndex];
+                        var y = rows[i+1].getElementsByTagName("TD")[colIndex];
+                        var valX = x.innerText || x.textContent;
+                        var valY = y.innerText || y.textContent;
+                        var numX = parseFloat(valX.replace(/[^0-9.-]/g, ''));
+                        var numY = parseFloat(valY.replace(/[^0-9.-]/g, ''));
+                        if (!isNaN(numX) && !isNaN(numY) && valX.includes("%")) { valX = numX; valY = numY; }
+                        else { valX = valX.toLowerCase(); valY = valY.toLowerCase(); }
+                        var shouldSwitch = (dir === "asc" && valX > valY) || (dir === "desc" && valX < valY);
+                        if (shouldSwitch) {
+                            rows[i].parentNode.insertBefore(rows[i+1], rows[i]);
+                            switching = true; switchcount++; break;
                         }
                     }
-                    if (shouldSwitch) {
-                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                        switching = true;
-                        switchcount ++;      
-                    } else {
-                        if (switchcount == 0 && dir == "asc") {
-                            dir = "desc";
-                            switching = true;
-                        }
-                    }
+                    if (!switching && switchcount === 0 && dir === "asc") { dir = "desc"; switching = true; }
                 }
             }
 
@@ -686,44 +624,33 @@ Westmount, QC H3Z 3C1`;
                         <th onclick="sortTable('shopTable', 2)">Cyan<br><small>(Need / Have)</small> ↕</th>
                         <th onclick="sortTable('shopTable', 3)">Magenta<br><small>(Need / Have)</small> ↕</th>
                         <th onclick="sortTable('shopTable', 4)">Yellow<br><small>(Need / Have)</small> ↕</th>
-                        <th onclick="sortTable('shopTable', 5)">Fuser<br><small>(Need / Have)</small> ↕</th>
-                        <th onclick="sortTable('shopTable', 6)">Waste<br><small>(Need / Have)</small> ↕</th>
                         <th>Parts to Order</th>
                         <th>Order Here</th>
                     </tr>
     """
 
     def get_inv_display(need, have):
-        if have > need:
-            color = "#2ecc71"
-        elif have == need:
-            color = "#f39c12"
-        else:
-            color = "#e74c3c"
+        color = "#2ecc71" if have > need else "#f39c12" if have == need else "#e74c3c"
         return f"{need} / <strong><span style='color:{color}'>{have}</span></strong>"
         
-    sorted_models = sorted(shopping_counts.keys(), key=lambda x: x.lower())
-    for model in sorted_models:
+    for model in sorted(shopping_counts.keys(), key=lambda x: x.lower()):
         counts = shopping_counts[model]
         inv_counts = inventory.get(model, {})
-        
-        parts_to_order = []
         model_parts = PART_NUMBERS.get(model, {})
         
-        for item in ["Black", "Cyan", "Magenta", "Yellow", "Fuser", "Waste"]:
+        parts_to_order = []
+        for item in ["Black", "Cyan", "Magenta", "Yellow"]:
             if counts[item] > 0:
-                part_no = model_parts.get(item, "?")
-                parts_to_order.append(f"{item}: {part_no}")
+                parts_to_order.append(f"{item}: {model_parts.get(item, '?')}")
         
         parts_str = "<br>".join(parts_to_order) if parts_to_order else "None needed yet"
         
-        order_link = ""
         if "Galactica" in model:
-            order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
+            order_link = "<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
         elif "Orion" in model:
-            order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Orion', '3TQ0 1854'); return false;\">📧 Email Canon</a>"
+            order_link = "<a href='#' onclick=\"sendOrderEmail('canon', 'Orion', '3TQ0 1854'); return false;\">📧 Email Canon</a>"
         elif "Mercury" in model:
-            order_link = f"<a href='#' onclick=\"sendOrderEmail('printersplus', 'Mercury', 'Xerox AltaLink C8145'); return false;\">📧 Email PrintersPlus</a>"
+            order_link = "<a href='#' onclick=\"sendOrderEmail('printersplus', 'Mercury', 'Xerox AltaLink C8145'); return false;\">📧 Email PrintersPlus</a>"
         else:
             order_link = "<a href='https://www.printersplus.net' target='_blank'>🌐 printersplus.net</a>"
         
@@ -734,8 +661,6 @@ Westmount, QC H3Z 3C1`;
                     <td>{get_inv_display(counts['Cyan'], inv_counts.get('Cyan', 0))}</td>
                     <td>{get_inv_display(counts['Magenta'], inv_counts.get('Magenta', 0))}</td>
                     <td>{get_inv_display(counts['Yellow'], inv_counts.get('Yellow', 0))}</td>
-                    <td>{get_inv_display(counts['Fuser'], inv_counts.get('Fuser', 0))}</td>
-                    <td>{get_inv_display(counts['Waste'], inv_counts.get('Waste', 0))}</td>
                     <td>{parts_str}</td>
                     <td>{order_link}</td>
                 </tr>
@@ -756,54 +681,33 @@ Westmount, QC H3Z 3C1`;
                         <th onclick="sortTable('statusTable', 6)">Cyan ↕</th>
                         <th onclick="sortTable('statusTable', 7)">Magenta ↕</th>
                         <th onclick="sortTable('statusTable', 8)">Yellow ↕</th>
-                        <th onclick="sortTable('statusTable', 9)">Fuser ↕</th>
-                        <th onclick="sortTable('statusTable', 10)">Waste ↕</th>
                     </tr>
     """
 
-    def format_supply(val, is_waste=False, color_type="black"):
+    def format_supply(val, color_type="black"):
         if val == "" or val is None: return "-"
-        if val in ["OK", "?"]: return val
-        if val == "REPLACE": return "<span class='offline'>REPLACE</span>"
+        if val == "?": return "?"
         if isinstance(val, int):
             actual_val = 0 if val == -2 else val
-
-            if is_waste:
-                # val is now always REMAINING CAPACITY (Xerox already inverted in main).
-                # 100% = bin completely empty = great.
-                # 0%   = bin completely full  = needs replacement.
-                if actual_val >= 50:
-                    bar_color = "#2ecc71"   # green  — plenty of space
-                elif actual_val >= 15:
-                    bar_color = "#f39c12"   # orange — getting full
-                else:
-                    bar_color = "#e74c3c"   # red    — almost full, replace soon
-                # Use a minimum bar width of 4% so the red is always visible at 0%.
-                width_percent = max(actual_val, 4) if actual_val == 0 else actual_val
-            else:
-                bar_color = "var(--toner-fuser)"
-                if color_type == "black":    bar_color = "var(--toner-black)"
-                elif color_type == "cyan":   bar_color = "var(--toner-cyan)"
-                elif color_type == "magenta": bar_color = "var(--toner-magenta)"
-                elif color_type == "yellow": bar_color = "var(--toner-yellow)"
-                width_percent = actual_val if actual_val >= 0 else 0
-
-            display = f"{actual_val}%"
+            if color_type == "black":   bar_color = "var(--toner-black)"
+            elif color_type == "cyan":   bar_color = "var(--toner-cyan)"
+            elif color_type == "magenta": bar_color = "var(--toner-magenta)"
+            elif color_type == "yellow": bar_color = "var(--toner-yellow)"
+            else: bar_color = "#95a5a6"
+            width_percent = max(actual_val, 0)
             return (
                 f"<div class='progress-container'>"
-                f"<div class='progress-bar' style='width: {width_percent}%; background-color: {bar_color};'></div>"
-                f"<span class='progress-text'>{display}</span>"
+                f"<div class='progress-bar' style='width:{width_percent}%;background-color:{bar_color};'></div>"
+                f"<span class='progress-text'>{actual_val}%</span>"
                 f"</div>"
             )
         return val
 
     for p in printer_data:
         status_class = "offline" if p['online'] == "NO" or p['state'] == "DOWN" else "online"
-        
         alerts_data = p['alerts']
         alerts_td_content = "-"
         alerts_td_class_attr = ""
-
         if alerts_data['text']:
             alerts_td_content = alerts_data['text']
             if alerts_data['is_critical']:
@@ -822,14 +726,12 @@ Westmount, QC H3Z 3C1`;
                         <td>{format_supply(p['c'], color_type='cyan')}</td>
                         <td>{format_supply(p['m'], color_type='magenta')}</td>
                         <td>{format_supply(p['y'], color_type='yellow')}</td>
-                        <td>{format_supply(p['fuser'], color_type='fuser')}</td>
-                        <td>{format_supply(p['waste'], is_waste=True)}</td>
                     </tr>
         """
 
     html += """
                 </table>
-            </div> </div>
+            </div></div>
     </body>
     </html>
     """
@@ -866,15 +768,12 @@ def main():
             logger.debug("Loaded %s existing alert-state entries from %s", len(alert_state), STATE_FILE)
         except Exception:
             logger.exception("Failed to load alert state from %s; continuing with empty state", STATE_FILE)
-    else:
-        logger.debug("No existing alert state file found at %s", STATE_FILE)
 
     current_broken_printers = []
 
     with open(CSV_FILE, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
         logger.info("Loaded %s printer definitions from %s", len(rows), CSV_FILE)
-        logger.info("Starting printer polling loop for %s printers", len(rows))
         for row in rows:
             ip, name, community = row["IP"], row["name"], row["community"]
             original_model = row.get("model", "Unknown Model")
@@ -883,7 +782,7 @@ def main():
             shopping_model_name = SUPPLY_MAPPING.get(original_model, original_model)
 
             if shopping_model_name not in shopping_counts:
-                shopping_counts[shopping_model_name] = {'Black': 0, 'Cyan': 0, 'Magenta': 0, 'Yellow': 0, 'Fuser': 0, 'Waste': 0}
+                shopping_counts[shopping_model_name] = {'Black': 0, 'Cyan': 0, 'Magenta': 0, 'Yellow': 0}
 
             dev_stat = snmp_get(ip, community, get_oid(original_model, "device_status"))
             online = "YES" if dev_stat else "NO"
@@ -891,41 +790,24 @@ def main():
             
             if online == "NO":
                 alerts_data = {"text": "Printer Offline or Unreachable", "is_critical": True, "is_warning": False}
-                b = c = m = y = fuser = waste_raw = waste_display = "-"
+                b = c = m = y = "-"
             else:
                 alerts_data = get_printer_alerts(ip, community)
-
                 model_parts = PART_NUMBERS.get(shopping_model_name, {})
                 
                 b = get_supply_percent(ip, community, original_model, "black")
                 c = "-" if model_parts.get("Cyan") == "N/A" else get_supply_percent(ip, community, original_model, "cyan")
                 m = "-" if model_parts.get("Magenta") == "N/A" else get_supply_percent(ip, community, original_model, "magenta")
                 y = "-" if model_parts.get("Yellow") == "N/A" else get_supply_percent(ip, community, original_model, "yellow")
-                fuser = get_supply_percent(ip, community, original_model, "fuser")
-                waste_raw = "-" if model_parts.get("Waste") == "N/A" else get_supply_percent(ip, community, original_model, "waste")
 
-                # Invert waste for models that report fullness instead of remaining capacity.
-                # After this point every downstream piece of logic (colors, shopping, swap)
-                # treats waste_raw uniformly as REMAINING CAPACITY.
-                if original_model in WASTE_INVERTED_MODELS and isinstance(waste_raw, int) and waste_raw >= 0:
-                    waste_raw = 100 - waste_raw
-                    logger.debug("Inverted waste for %s (%s): now %s%% remaining capacity", name, original_model, waste_raw)
-
-                waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
-                if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
-                    waste_raw = "REPLACE"
-                    waste_display = "REPLACE"
-                else:
-                    waste_display = format_waste(waste_raw)
-
+            # Automatic inventory deduction on toner swap
             if online == "YES":
-                curr_levels = {"Black": b, "Cyan": c, "Magenta": m, "Yellow": y, "Fuser": fuser, "Waste": waste_raw}
+                curr_levels = {"Black": b, "Cyan": c, "Magenta": m, "Yellow": y}
                 new_toner_state[name] = curr_levels
-                
                 prev_levels = toner_state.get(name, {})
                 for color_name, curr_val in curr_levels.items():
                     prev_val = prev_levels.get(color_name, "-")
-                    if is_swap(prev_val, curr_val, is_waste=(color_name=="Waste")):
+                    if is_swap(prev_val, curr_val):
                         if shopping_model_name in inventory:
                             current_stock = inventory[shopping_model_name].get(color_name, 0)
                             inventory[shopping_model_name][color_name] = max(0, current_stock - 1)
@@ -933,17 +815,15 @@ def main():
             else:
                 new_toner_state[name] = toner_state.get(name, {})
 
+            # Failsafe: flag 0% toners as warnings
             failsafe_errors = []
-            for color_name, val in [("Black Toner", b), ("Cyan Toner", c), ("Magenta Toner", m), ("Yellow Toner", y), ("Fuser", fuser)]:
+            for color_name, val in [("Black Toner", b), ("Cyan Toner", c), ("Magenta Toner", m), ("Yellow Toner", y)]:
                 if isinstance(val, int) and (val == 0 or val == -2):
                     failsafe_errors.append(f"{color_name} is empty (0%)")
             
             if failsafe_errors:
                 alerts_data['is_warning'] = True
-                if alerts_data['text']:
-                    alerts_data['text'] = alerts_data['text'] + " | " + " | ".join(failsafe_errors)
-                else:
-                    alerts_data['text'] = " | ".join(failsafe_errors)
+                alerts_data['text'] = (alerts_data['text'] + " | " if alerts_data['text'] else "") + " | ".join(failsafe_errors)
 
             if alerts_data['is_critical']:
                 current_broken_printers.append(name)
@@ -955,29 +835,16 @@ def main():
                 else:
                     logger.debug("Critical alert for %s already recorded in alert state", name)
 
-            waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
-            if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
-                waste_raw = "REPLACE"
-                waste_display = "REPLACE"
-            else:
-                waste_display = format_waste(waste_raw)
-
+            # Shopping counts
             for color, val in [("Black", b), ("Cyan", c), ("Magenta", m), ("Yellow", y)]:
                 if isinstance(val, int) and (val <= TONER_LOW_THRESHOLD or val == -2):
                     shopping_counts[shopping_model_name][color] += 1
-            
-            if isinstance(fuser, int) and (fuser <= TONER_LOW_THRESHOLD or fuser == 0 or fuser == -2):
-                shopping_counts[shopping_model_name]['Fuser'] += 1
-
-            # Waste shopping: trigger when remaining capacity <= WASTE_LOW_THRESHOLD (bin nearly full).
-            if waste_raw == "REPLACE" or (isinstance(waste_raw, int) and waste_raw >= 0 and waste_raw <= WASTE_LOW_THRESHOLD):
-                shopping_counts[shopping_model_name]['Waste'] += 1
 
             printer_data.append({
                 "name": name, "ip": ip, "model": original_model,
                 "online": online, "state": state,
-                "alerts": alerts_data, 
-                "b": b, "c": c, "m": m, "y": y, "fuser": fuser, "waste": waste_display,
+                "alerts": alerts_data,
+                "b": b, "c": c, "m": m, "y": y,
             })
             logger.debug(
                 "Completed polling for %s: online=%s state=%s critical=%s warning=%s",
@@ -993,7 +860,6 @@ def main():
         
     with open(STATE_FILE, "w") as f:
         json.dump(alert_state, f)
-    logger.debug("Wrote %s alert-state entries to %s", len(alert_state), STATE_FILE)
     
     save_inventory(inventory)
     with open(TONER_STATE_FILE, "w") as f:
