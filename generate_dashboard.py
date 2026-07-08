@@ -64,18 +64,10 @@ SENDER_EMAIL = os.environ.get("PRINTER_MONITOR_SENDER_EMAIL", "no-reply@goldwate
 RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_RECIPIENT_EMAILS", "as@goldwaterdroit.com").split(",") if email.strip()]
 
 # === COMPANY POLICY ===
-TONER_LOW_THRESHOLD = 5     
-WASTE_FULL_THRESHOLD = 95
-
-# === CHANGE 1: Models that show a live waste % bar instead of just "OK" ===
-# Uses original_model from the CSV so all printers of that type get the bar,
-# regardless of how many share the same shopping group name.
-WASTE_BAR_MODELS = {
-    "Canon C5170",          # Galactica, Pegasus (and any future Canon C5170)
-    "HP M880z",             # Valkyrie
-    "imageFORCE C7165",     # Orion
-    "Xerox AltaLink C8145", # Mercury — Xerox override removed; real OID used now
-}
+TONER_LOW_THRESHOLD = 5
+# Waste: SNMP reports REMAINING CAPACITY (100% = bin empty = good, 0% = bin full = bad).
+# Trigger shopping when remaining capacity drops to or below this threshold.
+WASTE_LOW_THRESHOLD = 10
 
 # === SHOPPING LIST NICKNAMES ===
 SUPPLY_MAPPING = {
@@ -266,8 +258,9 @@ def to_number(value):
     except: return ""
 
 def format_waste(value):
-    if value in [-2, -3]: return "OK"
-    if value == -1: return "?"
+    # Waste SNMP value = remaining capacity (100% = empty bin, 0% = full bin).
+    # Negative values are error/unknown codes from the printer.
+    if isinstance(value, int) and value < 0: return "?"
     return value
 
 def map_status(value):
@@ -305,17 +298,9 @@ def send_critical_email(printer_name, ip_address, error_text):
 
     logger.info(
         "Sending alert email for %s via %s:%s from %s using EHLO %s",
-        printer_name,
-        SMTP_SERVER,
-        SMTP_PORT,
-        SENDER_EMAIL,
-        smtp_local_hostname,
+        printer_name, SMTP_SERVER, SMTP_PORT, SENDER_EMAIL, smtp_local_hostname,
     )
-    logger.debug(
-        "Alert email recipients for %s: %s",
-        printer_name,
-        ", ".join(RECIPIENT_EMAILS),
-    )
+    logger.debug("Alert email recipients for %s: %s", printer_name, ", ".join(RECIPIENT_EMAILS))
 
     try:
         with InstrumentedSMTP(local_hostname=smtp_local_hostname) as server:
@@ -323,9 +308,7 @@ def send_critical_email(printer_name, ip_address, error_text):
             connect_code, connect_response = server.connect(SMTP_SERVER, SMTP_PORT)
             logger.debug(
                 "SMTP connect completed for %s with code=%s response=%s local_hostname=%s peer=%s sockname=%s",
-                printer_name,
-                connect_code,
-                format_smtp_response(connect_response),
+                printer_name, connect_code, format_smtp_response(connect_response),
                 server.local_hostname,
                 server.sock.getpeername() if server.sock else None,
                 server.sock.getsockname() if server.sock else None,
@@ -333,20 +316,14 @@ def send_critical_email(printer_name, ip_address, error_text):
             ehlo_code, ehlo_response = server.ehlo()
             logger.debug(
                 "SMTP EHLO completed for %s with code=%s response=%s does_esmtp=%s features=%s",
-                printer_name,
-                ehlo_code,
-                format_smtp_response(ehlo_response),
-                server.does_esmtp,
-                server.esmtp_features,
+                printer_name, ehlo_code, format_smtp_response(ehlo_response),
+                server.does_esmtp, server.esmtp_features,
             )
             if SMTP_STARTTLS:
                 starttls_supported = server.has_extn("starttls")
                 logger.debug(
                     "SMTP STARTTLS availability for %s: requested=%s required=%s supported=%s",
-                    printer_name,
-                    SMTP_STARTTLS,
-                    SMTP_REQUIRE_STARTTLS,
-                    starttls_supported,
+                    printer_name, SMTP_STARTTLS, SMTP_REQUIRE_STARTTLS, starttls_supported,
                 )
                 if not starttls_supported:
                     if SMTP_REQUIRE_STARTTLS:
@@ -355,28 +332,20 @@ def send_critical_email(printer_name, ip_address, error_text):
                     starttls_code, starttls_response = server.starttls(context=ssl.create_default_context())
                     logger.debug(
                         "SMTP STARTTLS completed for %s with code=%s response=%s",
-                        printer_name,
-                        starttls_code,
-                        format_smtp_response(starttls_response),
+                        printer_name, starttls_code, format_smtp_response(starttls_response),
                     )
                     ehlo_code, ehlo_response = server.ehlo()
                     logger.debug(
                         "SMTP post-STARTTLS EHLO completed for %s with code=%s response=%s does_esmtp=%s features=%s",
-                        printer_name,
-                        ehlo_code,
-                        format_smtp_response(ehlo_response),
-                        server.does_esmtp,
-                        server.esmtp_features,
+                        printer_name, ehlo_code, format_smtp_response(ehlo_response),
+                        server.does_esmtp, server.esmtp_features,
                     )
             server.send_message(msg, from_addr=SENDER_EMAIL, to_addrs=RECIPIENT_EMAILS)
         logger.info("Alert email sent for %s", printer_name)
     except smtplib.SMTPSenderRefused as exc:
         logger.error(
             "SMTP sender refused for %s with code=%s sender=%s ehlo=%s response=%s",
-            printer_name,
-            exc.smtp_code,
-            exc.sender,
-            smtp_local_hostname,
+            printer_name, exc.smtp_code, exc.sender, smtp_local_hostname,
             format_smtp_response(exc.smtp_error),
         )
         logger.exception("Failed to send alert email for %s", printer_name)
@@ -402,13 +371,7 @@ def get_printer_alerts(ip, community):
     for line in raw_alerts.split("\n"):
         if "STRING:" in line:
             alert_text = line.split("STRING:")[-1].strip().strip('"')
-            
-            is_ignored = False
-            for ignored_item in ignore_list:
-                if ignored_item in alert_text.lower():
-                    is_ignored = True
-                    break
-            
+            is_ignored = any(ignored_item in alert_text.lower() for ignored_item in ignore_list)
             if alert_text and not is_ignored:
                 valid_alerts_found.append(alert_text)
                 
@@ -419,7 +382,6 @@ def get_printer_alerts(ip, community):
 
     for text in valid_alerts_found:
         text_lower = text.lower()
-        
         safe_text = text_lower.replace("do not replace", "ignore_swap")
         safe_text = safe_text.replace("services are unaffected", "ops fine")
         safe_text = safe_text.replace("copy services", "copy ops")
@@ -471,12 +433,15 @@ def is_swap(prev_val, curr_val, is_waste=False):
     except (ValueError, TypeError):
         return False
         
-    if c in [-2, -3] or p in [-2, -3]:
+    if c < 0 or p < 0:
         return False
         
     if is_waste:
-        return p >= 80 and c <= 20
+        # Waste = remaining capacity. A swap (new empty bin installed) means
+        # remaining capacity jumps from nearly 0% back up to near 100%.
+        return p <= 20 and c >= 80
     else:
+        # Toner counts DOWN. A swap is when it jumps from near-empty to near-full.
         return p <= 15 and c >= 95
 
 # =========================
@@ -786,39 +751,33 @@ Westmount, QC H3Z 3C1`;
                     </tr>
     """
 
-    # === CHANGE 2: waste_bar parameter added to format_supply ===
-    # - waste_bar=False (default): old behaviour — shows "OK" when not full, red bar when full
-    # - waste_bar=True: shows a green→orange→red bar at all levels
-    def format_supply(val, is_waste=False, color_type="black", waste_bar=False):
+    def format_supply(val, is_waste=False, color_type="black"):
         if val == "" or val is None: return "-"
         if val in ["OK", "?"]: return val
         if val == "REPLACE": return "<span class='offline'>REPLACE</span>"
         if isinstance(val, int):
-            bar_color = "var(--toner-fuser)"
-            if color_type == "black":   bar_color = "var(--toner-black)"
-            elif color_type == "cyan":   bar_color = "var(--toner-cyan)"
-            elif color_type == "magenta": bar_color = "var(--toner-magenta)"
-            elif color_type == "yellow": bar_color = "var(--toner-yellow)"
-
             actual_val = 0 if val == -2 else val
 
-            if is_waste and not waste_bar:
-                # Original behaviour: only show a bar when full, otherwise "OK"
-                if actual_val >= WASTE_FULL_THRESHOLD:
-                    bar_color = "#e74c3c"
+            if is_waste:
+                # SNMP waste = remaining capacity. 100% = bin empty (great). 0% = bin full (replace).
+                # Color: green when lots of space, orange mid-way, red when nearly full.
+                if actual_val >= 50:
+                    bar_color = "#2ecc71"   # green  — bin is mostly empty
+                elif actual_val >= 15:
+                    bar_color = "#f39c12"   # orange — bin is filling up
                 else:
-                    return "OK"
-            elif is_waste and waste_bar:
-                # New behaviour: always show a bar, colour shifts green→orange→red
-                if actual_val < 50:
-                    bar_color = "#2ecc71"
-                elif actual_val < WASTE_FULL_THRESHOLD:
-                    bar_color = "#f39c12"
-                else:
-                    bar_color = "#e74c3c"
+                    bar_color = "#e74c3c"   # red    — bin almost full, replace soon
+                display = f"{actual_val}%"
+                width_percent = actual_val if actual_val >= 0 else 0
+            else:
+                bar_color = "var(--toner-fuser)"
+                if color_type == "black":   bar_color = "var(--toner-black)"
+                elif color_type == "cyan":   bar_color = "var(--toner-cyan)"
+                elif color_type == "magenta": bar_color = "var(--toner-magenta)"
+                elif color_type == "yellow": bar_color = "var(--toner-yellow)"
+                display = f"{actual_val}%"
+                width_percent = actual_val if actual_val >= 0 else 0
 
-            display = f"{actual_val}%"
-            width_percent = actual_val if actual_val >= 0 else 0
             return (
                 f"<div class='progress-container'>"
                 f"<div class='progress-bar' style='width: {width_percent}%; background-color: {bar_color};'></div>"
@@ -841,7 +800,6 @@ Westmount, QC H3Z 3C1`;
             elif alerts_data['is_warning']:
                 alerts_td_class_attr = "class='alert-warning'"
         
-        # === CHANGE 3: pass waste_bar flag stored on each printer dict ===
         html += f"""
                     <tr>
                         <td><strong><a href="http://{p['ip']}" target="_blank">{p['name']}</a></strong></td>
@@ -854,7 +812,7 @@ Westmount, QC H3Z 3C1`;
                         <td>{format_supply(p['m'], color_type='magenta')}</td>
                         <td>{format_supply(p['y'], color_type='yellow')}</td>
                         <td>{format_supply(p['fuser'], color_type='fuser')}</td>
-                        <td>{format_supply(p['waste'], is_waste=True, color_type='waste', waste_bar=p.get('waste_bar', False))}</td>
+                        <td>{format_supply(p['waste'], is_waste=True)}</td>
                     </tr>
         """
 
@@ -910,9 +868,6 @@ def main():
             ip, name, community = row["IP"], row["name"], row["community"]
             original_model = row.get("model", "Unknown Model")
             logger.debug("Polling printer %s at %s (model=%s)", name, ip, original_model)
-
-            # === CHANGE 4: determine waste_bar flag from original_model ===
-            waste_bar = original_model in WASTE_BAR_MODELS
             
             shopping_model_name = SUPPLY_MAPPING.get(original_model, original_model)
 
@@ -938,11 +893,8 @@ def main():
                 fuser = get_supply_percent(ip, community, original_model, "fuser")
                 waste_raw = "-" if model_parts.get("Waste") == "N/A" else get_supply_percent(ip, community, original_model, "waste")
 
-                # === CHANGE 5: Xerox override REMOVED ===
-                # The old "waste_raw = -3" forced Mercury's waste to always show "OK",
-                # which prevented the bar from working. Mercury is now in WASTE_BAR_MODELS
-                # so it gets real SNMP data. If Mercury ever shows a weird drum % instead
-                # of actual waste, add its specific waste OID to MODEL_OIDS above.
+                # Note: no Xerox override here. If Mercury shows drum % instead of
+                # waste %, add a corrected OID to MODEL_OIDS.
 
                 waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
                 if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
@@ -1002,21 +954,20 @@ def main():
             if isinstance(fuser, int) and (fuser <= TONER_LOW_THRESHOLD or fuser == 0 or fuser == -2):
                 shopping_counts[shopping_model_name]['Fuser'] += 1
 
-            if (isinstance(waste_raw, int) and waste_raw >= WASTE_FULL_THRESHOLD) or waste_raw == "REPLACE":
+            # Waste: trigger shopping when remaining capacity <= WASTE_LOW_THRESHOLD,
+            # meaning the bin is almost full and needs to be replaced soon.
+            if waste_raw == "REPLACE" or (isinstance(waste_raw, int) and waste_raw >= 0 and waste_raw <= WASTE_LOW_THRESHOLD):
                 shopping_counts[shopping_model_name]['Waste'] += 1
 
-            # === CHANGE 6: waste_bar added to printer_data dict ===
             printer_data.append({
                 "name": name, "ip": ip, "model": original_model,
                 "online": online, "state": state,
                 "alerts": alerts_data, 
                 "b": b, "c": c, "m": m, "y": y, "fuser": fuser, "waste": waste_display,
-                "waste_bar": waste_bar,
             })
             logger.debug(
-                "Completed polling for %s: online=%s state=%s critical=%s warning=%s waste_bar=%s",
-                name, online, state,
-                alerts_data['is_critical'], alerts_data['is_warning'], waste_bar,
+                "Completed polling for %s: online=%s state=%s critical=%s warning=%s",
+                name, online, state, alerts_data['is_critical'], alerts_data['is_warning'],
             )
         logger.info("Completed printer polling loop for %s printers", len(printer_data))
 
@@ -1035,7 +986,6 @@ def main():
         json.dump(new_toner_state, f)
 
     printer_data.sort(key=lambda x: x['name'].lower())
-
     timestamp = format_display_timestamp(get_local_now())
     generate_html(printer_data, shopping_counts, inventory, timestamp)
     logger.info(
