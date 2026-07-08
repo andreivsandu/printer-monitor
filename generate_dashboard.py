@@ -65,9 +65,16 @@ RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_R
 
 # === COMPANY POLICY ===
 TONER_LOW_THRESHOLD = 5
-# Waste: SNMP reports REMAINING CAPACITY (100% = bin empty = good, 0% = bin full = bad).
-# Trigger shopping when remaining capacity drops to or below this threshold.
+
+# Waste SNMP values mean REMAINING CAPACITY: 100% = bin empty (great), 0% = bin full (replace).
+# Shopping triggers when remaining capacity drops to or below this value.
 WASTE_LOW_THRESHOLD = 10
+
+# These models report waste as FULLNESS (0% = empty, 100% = full) — the opposite of Canon.
+# Their raw SNMP value is inverted to remaining capacity before any further logic runs.
+WASTE_INVERTED_MODELS = {
+    "Xerox AltaLink C8145",  # Mercury: reports how full the bin is, not how much space remains
+}
 
 # === SHOPPING LIST NICKNAMES ===
 SUPPLY_MAPPING = {
@@ -258,8 +265,12 @@ def to_number(value):
     except: return ""
 
 def format_waste(value):
-    # Waste SNMP value = remaining capacity (100% = empty bin, 0% = full bin).
-    # Negative values are error/unknown codes from the printer.
+    # -2 = printer doesn't expose waste via SNMP (most HPs) — treat as OK.
+    # -3 = also unknown/unsupported — treat as OK.
+    # -1 = printer explicitly says "unknown" — show ?.
+    # Any other negative = unexpected, show ?.
+    if value in [-2, -3]: return "OK"
+    if value == -1: return "?"
     if isinstance(value, int) and value < 0: return "?"
     return value
 
@@ -437,11 +448,10 @@ def is_swap(prev_val, curr_val, is_waste=False):
         return False
         
     if is_waste:
-        # Waste = remaining capacity. A swap (new empty bin installed) means
-        # remaining capacity jumps from nearly 0% back up to near 100%.
+        # Waste = remaining capacity (after inversion for Xerox).
+        # A swap (new empty bin) means remaining capacity jumps from near-0 back to near-100.
         return p <= 20 and c >= 80
     else:
-        # Toner counts DOWN. A swap is when it jumps from near-empty to near-full.
         return p <= 15 and c >= 95
 
 # =========================
@@ -759,25 +769,26 @@ Westmount, QC H3Z 3C1`;
             actual_val = 0 if val == -2 else val
 
             if is_waste:
-                # SNMP waste = remaining capacity. 100% = bin empty (great). 0% = bin full (replace).
-                # Color: green when lots of space, orange mid-way, red when nearly full.
+                # val is now always REMAINING CAPACITY (Xerox already inverted in main).
+                # 100% = bin completely empty = great.
+                # 0%   = bin completely full  = needs replacement.
                 if actual_val >= 50:
-                    bar_color = "#2ecc71"   # green  — bin is mostly empty
+                    bar_color = "#2ecc71"   # green  — plenty of space
                 elif actual_val >= 15:
-                    bar_color = "#f39c12"   # orange — bin is filling up
+                    bar_color = "#f39c12"   # orange — getting full
                 else:
-                    bar_color = "#e74c3c"   # red    — bin almost full, replace soon
-                display = f"{actual_val}%"
-                width_percent = actual_val if actual_val >= 0 else 0
+                    bar_color = "#e74c3c"   # red    — almost full, replace soon
+                # Use a minimum bar width of 4% so the red is always visible at 0%.
+                width_percent = max(actual_val, 4) if actual_val == 0 else actual_val
             else:
                 bar_color = "var(--toner-fuser)"
-                if color_type == "black":   bar_color = "var(--toner-black)"
+                if color_type == "black":    bar_color = "var(--toner-black)"
                 elif color_type == "cyan":   bar_color = "var(--toner-cyan)"
                 elif color_type == "magenta": bar_color = "var(--toner-magenta)"
                 elif color_type == "yellow": bar_color = "var(--toner-yellow)"
-                display = f"{actual_val}%"
                 width_percent = actual_val if actual_val >= 0 else 0
 
+            display = f"{actual_val}%"
             return (
                 f"<div class='progress-container'>"
                 f"<div class='progress-bar' style='width: {width_percent}%; background-color: {bar_color};'></div>"
@@ -893,8 +904,12 @@ def main():
                 fuser = get_supply_percent(ip, community, original_model, "fuser")
                 waste_raw = "-" if model_parts.get("Waste") == "N/A" else get_supply_percent(ip, community, original_model, "waste")
 
-                # Note: no Xerox override here. If Mercury shows drum % instead of
-                # waste %, add a corrected OID to MODEL_OIDS.
+                # Invert waste for models that report fullness instead of remaining capacity.
+                # After this point every downstream piece of logic (colors, shopping, swap)
+                # treats waste_raw uniformly as REMAINING CAPACITY.
+                if original_model in WASTE_INVERTED_MODELS and isinstance(waste_raw, int) and waste_raw >= 0:
+                    waste_raw = 100 - waste_raw
+                    logger.debug("Inverted waste for %s (%s): now %s%% remaining capacity", name, original_model, waste_raw)
 
                 waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
                 if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
@@ -954,8 +969,7 @@ def main():
             if isinstance(fuser, int) and (fuser <= TONER_LOW_THRESHOLD or fuser == 0 or fuser == -2):
                 shopping_counts[shopping_model_name]['Fuser'] += 1
 
-            # Waste: trigger shopping when remaining capacity <= WASTE_LOW_THRESHOLD,
-            # meaning the bin is almost full and needs to be replaced soon.
+            # Waste shopping: trigger when remaining capacity <= WASTE_LOW_THRESHOLD (bin nearly full).
             if waste_raw == "REPLACE" or (isinstance(waste_raw, int) and waste_raw >= 0 and waste_raw <= WASTE_LOW_THRESHOLD):
                 shopping_counts[shopping_model_name]['Waste'] += 1
 
