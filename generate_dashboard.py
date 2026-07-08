@@ -65,7 +65,17 @@ RECIPIENT_EMAILS = [email.strip() for email in os.environ.get("PRINTER_MONITOR_R
 
 # === COMPANY POLICY ===
 TONER_LOW_THRESHOLD = 5     
-WASTE_FULL_THRESHOLD = 95   
+WASTE_FULL_THRESHOLD = 95
+
+# === CHANGE 1: Models that show a live waste % bar instead of just "OK" ===
+# Uses original_model from the CSV so all printers of that type get the bar,
+# regardless of how many share the same shopping group name.
+WASTE_BAR_MODELS = {
+    "Canon C5170",          # Galactica, Pegasus (and any future Canon C5170)
+    "HP M880z",             # Valkyrie
+    "imageFORCE C7165",     # Orion
+    "Xerox AltaLink C8145", # Mercury — Xerox override removed; real OID used now
+}
 
 # === SHOPPING LIST NICKNAMES ===
 SUPPLY_MAPPING = {
@@ -384,11 +394,7 @@ def get_printer_alerts(ip, community):
         return {"text": "", "is_critical": False, "is_warning": False}
 
     ignore_list = ["ready", "sleep mode", "power save", "ok", "printing", "warming up", "sleep mode on"]
-    
-    # "jam", "dead", "service", and specific HP numbered errors mean the printer is actually broken.
     critical_keywords = ["jam", "dead", "depleted", "exhausted", "service", "offline", "install", "failure", "41.", "49.", "50.", "59."] 
-    
-    # "paused", "error", "cleaning", and "empty" are now just yellow warnings. NO EMAILS.
     warning_keywords = ["low", "very low", "used supply", "open", "empty", "load", "paused", "cleaning", "tray", "error"]
 
     valid_alerts_found = []
@@ -446,7 +452,6 @@ def load_inventory():
             with open(INVENTORY_FILE, "r") as f:
                 return json.load(f)
         except Exception: pass
-    # If file doesn't exist, build a blank one based on your models
     inv = {}
     for model in PART_NUMBERS:
         inv[model] = {"Black": 0, "Cyan": 0, "Magenta": 0, "Yellow": 0, "Fuser": 0, "Waste": 0}
@@ -466,15 +471,12 @@ def is_swap(prev_val, curr_val, is_waste=False):
     except (ValueError, TypeError):
         return False
         
-    # FIX: Ignore -2 (Unknown) and -3 (Xerox OK) so they don't trigger false swaps
     if c in [-2, -3] or p in [-2, -3]:
         return False
         
     if is_waste:
-        # Waste boxes count UP. A swap is when it drops from 80%+ down to <20%
         return p >= 80 and c <= 20
     else:
-        # Toners count DOWN. A swap is when it jumps from <15% up to 95%+
         return p <= 15 and c >= 95
 
 # =========================
@@ -490,7 +492,6 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Office Printer Dashboard</title>
         <style>
-            /* CSS Variables for Dark/Light Mode */
             :root {
                 --bg-color: #f4f7f6;
                 --text-color: #333;
@@ -505,7 +506,6 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
                 --shop-th: #2980b9;
                 --bar-bg: #e0e0e0;
                 --header-border: #3498db;
-                
                 --toner-black: #34495e;
                 --toner-cyan: #00bcd4;
                 --toner-magenta: #e91e63;
@@ -526,7 +526,6 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
                 --shop-th: #154360;
                 --bar-bg: #444;
                 --header-border: #64b5f6;
-                
                 --toner-black: #9aa7b1; 
                 --toner-cyan: #26c6da;
                 --toner-magenta: #ec407a;
@@ -539,36 +538,27 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
             h1 { color: var(--header-border); margin: 0; }
             h2 { color: var(--link-color); margin-top: 40px; }
             .timestamp { color: #7f8c8d; font-size: 0.9em; font-style: italic; }
-            
             table { width: 100%; border-collapse: collapse; background: var(--table-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
             th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--table-border); }
             th { background-color: var(--th-bg); color: var(--th-text); text-transform: uppercase; font-size: 0.85em; letter-spacing: 0.5px; cursor: pointer; user-select: none; transition: 0.2s; }
             th:hover { background-color: var(--link-hover); color: #fff; }
             tr:nth-child(even) { background-color: var(--row-even); }
             tr:hover { background-color: var(--row-hover); }
-            
             a { color: var(--link-color); text-decoration: none; font-weight: bold; }
             a:hover { text-decoration: underline; color: var(--link-hover); }
-
             .offline { color: #e74c3c; font-weight: bold; }
             .online { color: #2ecc71; font-weight: bold; }
             .shopping-table th { background-color: var(--shop-th); }
-            
             .alert-critical { background-color: #ffcccc; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
             .alert-warning { background-color: #ffe0b2; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
-            
-            /* Theme Toggle Button */
             .theme-toggle { background: var(--th-bg); color: var(--th-text); border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
             .theme-toggle:hover { background: var(--link-hover); color: #fff;}
-            
-            /* Progress Bars */
             .progress-container { width: 100%; min-width: 60px; background-color: var(--bar-bg); border-radius: 4px; position: relative; height: 22px; display: flex; align-items: center; overflow: hidden; border: 1px solid rgba(0,0,0,0.1);}
             .progress-bar { height: 100%; transition: width 0.5s ease; }
             .progress-text { position: absolute; width: 100%; text-align: center; font-size: 0.85em; font-weight: 700; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9); pointer-events: none;}
         </style>
         
         <script>
-            // --- SMART EMAIL SIGNATURE LOGIC ---
             function resetName() {
                 localStorage.removeItem('orderName');
                 alert("Signature name has been reset! You will be prompted for your name the next time you click to order.");
@@ -584,10 +574,8 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
                         userName = "IT Support"; 
                     }
                 }
-
                 let subject = "Toner Order - " + serial;
                 let printerDesc = printerName === 'Mercury' ? serial : "serial number " + serial;
-                
                 let fullMessage = `Dear sir/madam,
 
 Our printer (${printerDesc}) has run out of toner. We need a full set of colors and two blacks.
@@ -605,11 +593,9 @@ Westmount, QC H3Z 3C1`;
                 let fullBody = encodeURIComponent(fullMessage);
                 let encodedSubject = encodeURIComponent(subject);
                 let emailAddress = vendor === 'canon' ? 'canonsupplies@canada.canon.com' : 'cmorrison@printersplus.net';
-
                 window.location.href = "mailto:" + emailAddress + "?subject=" + encodedSubject + "&body=" + fullBody;
             }
 
-            // Dark Mode Logic
             if (localStorage.getItem('theme') === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
             }
@@ -619,46 +605,33 @@ Westmount, QC H3Z 3C1`;
                 localStorage.setItem('theme', isDark ? 'light' : 'dark');
             }
 
-            // Smooth Background Refresh (Checks every 1 minute)
             function startAutoRefresh() {
                 console.log("Auto-refresh timer started!");
-                addSyncIndicator(); // Add visual proof immediately
-
+                addSyncIndicator();
                 setInterval(async () => {
                     try {
-                        console.log("Attempting to fetch new data...");
-                        
-                        // The ?t= timestamp completely blocks browser caching
                         const url = window.location.pathname + "?t=" + new Date().getTime();
                         const response = await fetch(url, { cache: 'no-store' });
-                        
-                        if (!response.ok) {
-                            throw new Error("Server returned status: " + response.status);
-                        }
-
+                        if (!response.ok) { throw new Error("Server returned status: " + response.status); }
                         const html = await response.text();
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
-                        
                         let newContent = doc.getElementById('live-content');
                         if (newContent) {
                             document.getElementById('live-content').innerHTML = newContent.innerHTML;
-                            console.log("Successfully swapped HTML content!");
-                            addSyncIndicator(); // Update the visual clock
+                            addSyncIndicator();
                         } else {
                             console.error("Could not find 'live-content' in the downloaded file.");
                         }
                     } catch (e) { 
                         console.error("Auto-refresh completely failed:", e); 
                     }
-                }, 60000); // 60000 milliseconds = 1 minute
+                }, 60000);
             }
 
-            // This creates a small green clock to prove the JS is working
             function addSyncIndicator() {
                 let existing = document.getElementById('frontend-sync');
-                if (existing) { existing.remove(); } // Remove old one
-
+                if (existing) { existing.remove(); }
                 let syncDiv = document.createElement('div');
                 syncDiv.id = 'frontend-sync';
                 syncDiv.style.fontSize = '0.9em';
@@ -666,15 +639,12 @@ Westmount, QC H3Z 3C1`;
                 syncDiv.style.fontWeight = 'bold';
                 syncDiv.style.marginTop = '5px';
                 syncDiv.innerText = "⚡ Browser successfully checked server at: " + new Date().toLocaleTimeString();
-                
-                // Stick it right below the main Last Updated timestamp
                 let timestampDiv = document.querySelector('.timestamp');
                 if (timestampDiv) {
                     timestampDiv.parentNode.insertBefore(syncDiv, timestampDiv.nextSibling);
                 }
             }
 
-            // Table Sorting Logic
             function sortTable(tableId, colIndex) {
                 var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
                 table = document.getElementById(tableId);
@@ -687,19 +657,15 @@ Westmount, QC H3Z 3C1`;
                         shouldSwitch = false;
                         x = rows[i].getElementsByTagName("TD")[colIndex];
                         y = rows[i + 1].getElementsByTagName("TD")[colIndex];
-                        
                         let valX = x.innerText || x.textContent;
                         let valY = y.innerText || y.textContent;
-                        
                         let numX = parseFloat(valX.replace(/[^0-9.-]/g, ''));
                         let numY = parseFloat(valY.replace(/[^0-9.-]/g, ''));
-                        
                         if (!isNaN(numX) && !isNaN(numY) && valX.includes("%")) {
                             valX = numX; valY = numY;
                         } else {
                             valX = valX.toLowerCase(); valY = valY.toLowerCase();
                         }
-
                         if (dir == "asc") {
                             if (valX > valY) { shouldSwitch = true; break; }
                         } else if (dir == "desc") {
@@ -754,12 +720,11 @@ Westmount, QC H3Z 3C1`;
 
     def get_inv_display(need, have):
         if have > need:
-            color = "#2ecc71"  # Green
+            color = "#2ecc71"
         elif have == need:
-            color = "#f39c12"  # Yellow
+            color = "#f39c12"
         else:
-            color = "#e74c3c"  # Red
-            
+            color = "#e74c3c"
         return f"{need} / <strong><span style='color:{color}'>{have}</span></strong>"
         
     sorted_models = sorted(shopping_counts.keys(), key=lambda x: x.lower())
@@ -777,7 +742,6 @@ Westmount, QC H3Z 3C1`;
         
         parts_str = "<br>".join(parts_to_order) if parts_to_order else "None needed yet"
         
-        # Smart Order Links
         order_link = ""
         if "Galactica" in model:
             order_link = f"<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
@@ -822,31 +786,45 @@ Westmount, QC H3Z 3C1`;
                     </tr>
     """
 
-    def format_supply(val, is_waste=False, color_type="black"):
+    # === CHANGE 2: waste_bar parameter added to format_supply ===
+    # - waste_bar=False (default): old behaviour — shows "OK" when not full, red bar when full
+    # - waste_bar=True: shows a green→orange→red bar at all levels
+    def format_supply(val, is_waste=False, color_type="black", waste_bar=False):
         if val == "" or val is None: return "-"
         if val in ["OK", "?"]: return val
         if val == "REPLACE": return "<span class='offline'>REPLACE</span>"
         if isinstance(val, int):
-            
             bar_color = "var(--toner-fuser)"
-            if color_type == "black": bar_color = "var(--toner-black)"
-            elif color_type == "cyan": bar_color = "var(--toner-cyan)"
+            if color_type == "black":   bar_color = "var(--toner-black)"
+            elif color_type == "cyan":   bar_color = "var(--toner-cyan)"
             elif color_type == "magenta": bar_color = "var(--toner-magenta)"
             elif color_type == "yellow": bar_color = "var(--toner-yellow)"
-            
+
             actual_val = 0 if val == -2 else val
-            
-            if is_waste:
+
+            if is_waste and not waste_bar:
+                # Original behaviour: only show a bar when full, otherwise "OK"
                 if actual_val >= WASTE_FULL_THRESHOLD:
-                    bar_color = "#e74c3c" 
+                    bar_color = "#e74c3c"
                 else:
                     return "OK"
-            
+            elif is_waste and waste_bar:
+                # New behaviour: always show a bar, colour shifts green→orange→red
+                if actual_val < 50:
+                    bar_color = "#2ecc71"
+                elif actual_val < WASTE_FULL_THRESHOLD:
+                    bar_color = "#f39c12"
+                else:
+                    bar_color = "#e74c3c"
+
             display = f"{actual_val}%"
             width_percent = actual_val if actual_val >= 0 else 0
-                
-            return f"<div class='progress-container'><div class='progress-bar' style='width: {width_percent}%; background-color: {bar_color};'></div><span class='progress-text'>{display}</span></div>"
-            
+            return (
+                f"<div class='progress-container'>"
+                f"<div class='progress-bar' style='width: {width_percent}%; background-color: {bar_color};'></div>"
+                f"<span class='progress-text'>{display}</span>"
+                f"</div>"
+            )
         return val
 
     for p in printer_data:
@@ -863,6 +841,7 @@ Westmount, QC H3Z 3C1`;
             elif alerts_data['is_warning']:
                 alerts_td_class_attr = "class='alert-warning'"
         
+        # === CHANGE 3: pass waste_bar flag stored on each printer dict ===
         html += f"""
                     <tr>
                         <td><strong><a href="http://{p['ip']}" target="_blank">{p['name']}</a></strong></td>
@@ -875,7 +854,7 @@ Westmount, QC H3Z 3C1`;
                         <td>{format_supply(p['m'], color_type='magenta')}</td>
                         <td>{format_supply(p['y'], color_type='yellow')}</td>
                         <td>{format_supply(p['fuser'], color_type='fuser')}</td>
-                        <td>{format_supply(p['waste'], is_waste=True, color_type='waste')}</td>
+                        <td>{format_supply(p['waste'], is_waste=True, color_type='waste', waste_bar=p.get('waste_bar', False))}</td>
                     </tr>
         """
 
@@ -900,7 +879,6 @@ def main():
     logger.info("Starting dashboard generation using CSV=%s STATE=%s HTML=%s", CSV_FILE, STATE_FILE, HTML_FILE)
     
     shopping_counts = {}
-    
     inventory = load_inventory()
     
     toner_state = {}
@@ -932,6 +910,9 @@ def main():
             ip, name, community = row["IP"], row["name"], row["community"]
             original_model = row.get("model", "Unknown Model")
             logger.debug("Polling printer %s at %s (model=%s)", name, ip, original_model)
+
+            # === CHANGE 4: determine waste_bar flag from original_model ===
+            waste_bar = original_model in WASTE_BAR_MODELS
             
             shopping_model_name = SUPPLY_MAPPING.get(original_model, original_model)
 
@@ -939,18 +920,15 @@ def main():
                 shopping_counts[shopping_model_name] = {'Black': 0, 'Cyan': 0, 'Magenta': 0, 'Yellow': 0, 'Fuser': 0, 'Waste': 0}
 
             dev_stat = snmp_get(ip, community, get_oid(original_model, "device_status"))
-            
             online = "YES" if dev_stat else "NO"
             state = map_status(dev_stat)
             
-            # --- SMART BYPASS FOR OFFLINE PRINTERS ---
             if online == "NO":
                 alerts_data = {"text": "Printer Offline or Unreachable", "is_critical": True, "is_warning": False}
                 b = c = m = y = fuser = waste_raw = waste_display = "-"
             else:
                 alerts_data = get_printer_alerts(ip, community)
 
-                # --- SPEED FIX: DO NOT ASK B&W PRINTERS FOR COLOR ---
                 model_parts = PART_NUMBERS.get(shopping_model_name, {})
                 
                 b = get_supply_percent(ip, community, original_model, "black")
@@ -959,10 +937,12 @@ def main():
                 y = "-" if model_parts.get("Yellow") == "N/A" else get_supply_percent(ip, community, original_model, "yellow")
                 fuser = get_supply_percent(ip, community, original_model, "fuser")
                 waste_raw = "-" if model_parts.get("Waste") == "N/A" else get_supply_percent(ip, community, original_model, "waste")
-                
-                # --- XEROX OID FIX ---
-                if "Xerox" in original_model or "AltaLink" in original_model:
-                    waste_raw = -3  # Force to OK. The generic OID reads Drums on Xerox!
+
+                # === CHANGE 5: Xerox override REMOVED ===
+                # The old "waste_raw = -3" forced Mercury's waste to always show "OK",
+                # which prevented the bar from working. Mercury is now in WASTE_BAR_MODELS
+                # so it gets real SNMP data. If Mercury ever shows a weird drum % instead
+                # of actual waste, add its specific waste OID to MODEL_OIDS above.
 
                 waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
                 if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
@@ -971,7 +951,6 @@ def main():
                 else:
                     waste_display = format_waste(waste_raw)
 
-            # --- AUTOMATIC INVENTORY DEDUCTION ---
             if online == "YES":
                 curr_levels = {"Black": b, "Cyan": c, "Magenta": m, "Yellow": y, "Fuser": fuser, "Waste": waste_raw}
                 new_toner_state[name] = curr_levels
@@ -979,7 +958,6 @@ def main():
                 prev_levels = toner_state.get(name, {})
                 for color_name, curr_val in curr_levels.items():
                     prev_val = prev_levels.get(color_name, "-")
-                    
                     if is_swap(prev_val, curr_val, is_waste=(color_name=="Waste")):
                         if shopping_model_name in inventory:
                             current_stock = inventory[shopping_model_name].get(color_name, 0)
@@ -988,36 +966,27 @@ def main():
             else:
                 new_toner_state[name] = toner_state.get(name, {})
 
-
-            # --- THE FIX: Failsafe now flags both 0 AND -2 (Error) ---
             failsafe_errors = []
             for color_name, val in [("Black Toner", b), ("Cyan Toner", c), ("Magenta Toner", m), ("Yellow Toner", y), ("Fuser", fuser)]:
                 if isinstance(val, int) and (val == 0 or val == -2):
                     failsafe_errors.append(f"{color_name} is empty (0%)")
             
-            # --- OVERRIDE DASHBOARD ALERTS WITH FAILSAFE ---
             if failsafe_errors:
-                alerts_data['is_warning'] = True  # <--- CHANGED FROM is_critical to is_warning
+                alerts_data['is_warning'] = True
                 if alerts_data['text']:
                     alerts_data['text'] = alerts_data['text'] + " | " + " | ".join(failsafe_errors)
                 else:
                     alerts_data['text'] = " | ".join(failsafe_errors)
 
             if alerts_data['is_critical']:
-                current_broken_printers.append(name) 
-                
-                # Check if it's a new broken printer, OR if the error message has changed!
+                current_broken_printers.append(name)
                 if name not in alert_state or alert_state[name] != alerts_data['text']:
-                    # ONLY send the email if the error is NOT our custom offline message
                     if alerts_data['text'] != "Printer Offline or Unreachable":
                         logger.info("New or updated critical alert detected for %s; sending notification", name)
                         send_critical_email(name, ip, alerts_data['text'])
-                    
-                    alert_state[name] = alerts_data['text'] # Save the EXACT error text so it doesn't loop
+                    alert_state[name] = alerts_data['text']
                 else:
                     logger.debug("Critical alert for %s already recorded in alert state", name)
-                
-                    
 
             waste_alert_keywords = ["replace toner collection unit", "waste toner", "collection bin", "collection unit"]
             if any(kw in alerts_data['text'].lower() for kw in waste_alert_keywords):
@@ -1036,19 +1005,18 @@ def main():
             if (isinstance(waste_raw, int) and waste_raw >= WASTE_FULL_THRESHOLD) or waste_raw == "REPLACE":
                 shopping_counts[shopping_model_name]['Waste'] += 1
 
+            # === CHANGE 6: waste_bar added to printer_data dict ===
             printer_data.append({
                 "name": name, "ip": ip, "model": original_model,
                 "online": online, "state": state,
                 "alerts": alerts_data, 
-                "b": b, "c": c, "m": m, "y": y, "fuser": fuser, "waste": waste_display
+                "b": b, "c": c, "m": m, "y": y, "fuser": fuser, "waste": waste_display,
+                "waste_bar": waste_bar,
             })
             logger.debug(
-                "Completed polling for %s: online=%s state=%s critical=%s warning=%s",
-                name,
-                online,
-                state,
-                alerts_data['is_critical'],
-                alerts_data['is_warning'],
+                "Completed polling for %s: online=%s state=%s critical=%s warning=%s waste_bar=%s",
+                name, online, state,
+                alerts_data['is_critical'], alerts_data['is_warning'], waste_bar,
             )
         logger.info("Completed printer polling loop for %s printers", len(printer_data))
 
@@ -1069,13 +1037,10 @@ def main():
     printer_data.sort(key=lambda x: x['name'].lower())
 
     timestamp = format_display_timestamp(get_local_now())
-    
     generate_html(printer_data, shopping_counts, inventory, timestamp)
     logger.info(
         "Dashboard generated successfully at %s with %s printers and %s active critical alerts",
-        HTML_FILE,
-        len(printer_data),
-        len(current_broken_printers),
+        HTML_FILE, len(printer_data), len(current_broken_printers),
     )
 
 if __name__ == "__main__":
