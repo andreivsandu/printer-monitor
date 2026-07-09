@@ -71,7 +71,7 @@ SUPPLY_MAPPING = {
     "HP M554": "HP M554 / M555 Series",
     "HP M555": "HP M554 / M555 Series",
     "HP LaserJet M402dn": "HP M402dn (Labelist)",
-    "Canon C5170": "Canon C5170 (Galactica)",
+    "Canon C5170": "Canon C5170",
     "HP 2400": "HP 2400 (Exchequer)",
     "HP Color LaserJet 4525": "HP Color LaserJet 4525 (Dr. Zaius)",
     "HP Color LaserJet 4700": "HP Color LaserJet 4700 (RainbowAlliance)",
@@ -165,7 +165,7 @@ PART_NUMBERS = {
     "HP M402dn (Labelist)": {
         "Black": "CF226X", "Cyan": "N/A", "Magenta": "N/A", "Yellow": "N/A",
     },
-    "Canon C5170 (Galactica)": {
+    "Canon C5170": {
         "Black": "Black", "Cyan": "Cyan", "Magenta": "Magenta", "Yellow": "Yellow",
     },
     "HP 2400 (Exchequer)": {
@@ -652,7 +652,7 @@ Westmount, QC H3Z 3C1`;
 
         parts_str = "<br>".join(parts_to_order) if parts_to_order else "None needed yet"
 
-        if "Galactica" in model:
+        if model == "Canon C5170":
             order_link = "<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
         elif "Orion" in model:
             order_link = "<a href='#' onclick=\"sendOrderEmail('canon', 'Orion', '3TQ0 1854'); return false;\">📧 Email Canon</a>"
