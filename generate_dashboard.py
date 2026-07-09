@@ -19,9 +19,9 @@ BASE_PATH = os.environ.get("PRINTER_MONITOR_BASE_PATH", os.path.dirname(os.path.
 CSV_FILE = os.environ.get("PRINTER_MONITOR_CSV_FILE", f"{BASE_PATH}/printers.csv")
 RUNTIME_DIR = os.environ.get("PRINTER_MONITOR_RUNTIME_DIR", f"{BASE_PATH}/runtime")
 HTML_FILE = os.environ.get("PRINTER_MONITOR_HTML_FILE", f"{RUNTIME_DIR}/printer_dashboard.html")
-STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{RUNTIME_DIR}/alert_state.json") 
+STATE_FILE = os.environ.get("PRINTER_MONITOR_STATE_FILE", f"{RUNTIME_DIR}/alert_state.json")
 INVENTORY_FILE = os.environ.get("PRINTER_MONITOR_INVENTORY_FILE", f"{RUNTIME_DIR}/inventory.json")
-TONER_STATE_FILE = os.environ.get("PRINTER_MONITOR_TONER_STATE_FILE", f"{RUNTIME_DIR}/toner_state.json")
+SHOPPING_STATE_FILE = os.environ.get("PRINTER_MONITOR_SHOPPING_STATE_FILE", f"{RUNTIME_DIR}/shopping_state.json")
 DEFAULT_TIMEZONE_NAME = "America/Toronto"
 CONFIGURED_TIMEZONE_NAME = os.environ.get("PRINTER_MONITOR_TIMEZONE", os.environ.get("TZ", DEFAULT_TIMEZONE_NAME))
 LOG_LEVEL = getattr(logging, os.environ.get("PRINTER_MONITOR_LOG_LEVEL", "INFO").upper(), logging.INFO)
@@ -52,10 +52,10 @@ if hasattr(time, "tzset"):
 logger.info("Using printer monitor timezone %s", APP_TIMEZONE_NAME)
 
 # === EMAIL ALERTS CONFIG ===
-SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "true" 
+SEND_EMAILS = os.environ.get("PRINTER_MONITOR_SEND_EMAILS", "true").lower() == "true"
 
-SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp-relay.gmail.com")  
-SMTP_PORT = int(os.environ.get("PRINTER_MONITOR_SMTP_PORT", "25"))                 
+SMTP_SERVER = os.environ.get("PRINTER_MONITOR_SMTP_SERVER", "smtp-relay.gmail.com")
+SMTP_PORT = int(os.environ.get("PRINTER_MONITOR_SMTP_PORT", "25"))
 SMTP_EHLO_HOSTNAME = os.environ.get("PRINTER_MONITOR_SMTP_EHLO_HOSTNAME", "").strip()
 SMTP_LOG_PROTOCOL = os.environ.get("PRINTER_MONITOR_SMTP_LOG_PROTOCOL", "false").lower() == "true"
 SMTP_STARTTLS = os.environ.get("PRINTER_MONITOR_SMTP_STARTTLS", "false").lower() == "true"
@@ -140,19 +140,15 @@ def format_display_timestamp(value):
 def get_smtp_local_hostname(sender_email):
     if SMTP_EHLO_HOSTNAME:
         return SMTP_EHLO_HOSTNAME
-
     system_fqdn = socket.getfqdn().strip()
     if system_fqdn and system_fqdn.lower() != "localhost" and "." in system_fqdn:
         return system_fqdn
-
     sender_domain = sender_email.rsplit("@", 1)[1].strip() if "@" in sender_email else ""
     if sender_domain:
         return sender_domain
-
     system_hostname = socket.gethostname().strip()
     if system_hostname and system_hostname.lower() != "localhost":
         return system_hostname
-
     return "localhost"
 
 
@@ -161,7 +157,7 @@ def ensure_parent_dir(path):
     if directory:
         os.makedirs(directory, exist_ok=True)
 
-# === EXACT PART NUMBERS CHEAT SHEET (toner only — fuser/waste removed) ===
+# === EXACT PART NUMBERS CHEAT SHEET ===
 PART_NUMBERS = {
     "HP M554 / M555 Series": {
         "Black": "W2120X", "Cyan": "W2121X", "Magenta": "W2123X", "Yellow": "W2122X",
@@ -260,13 +256,10 @@ def get_oid(model, key):
 def get_supply_percent(ip, community, model, supply_key):
     level_oid = get_oid(model, supply_key)
     if not level_oid: return ""
-    
     level = to_number(snmp_get(ip, community, level_oid))
     if level == "" or level in [-2, -3]: return level
-        
     max_oid = level_oid.replace(".9.1.", ".8.1.")
     max_val = to_number(snmp_get(ip, community, max_oid))
-    
     if isinstance(max_val, int) and max_val > 0:
         return int((level / max_val) * 100)
     return level
@@ -308,10 +301,6 @@ def send_critical_email(printer_name, ip_address, error_text):
             )
             if SMTP_STARTTLS:
                 starttls_supported = server.has_extn("starttls")
-                logger.debug(
-                    "SMTP STARTTLS availability for %s: requested=%s required=%s supported=%s",
-                    printer_name, SMTP_STARTTLS, SMTP_REQUIRE_STARTTLS, starttls_supported,
-                )
                 if not starttls_supported:
                     if SMTP_REQUIRE_STARTTLS:
                         raise smtplib.SMTPNotSupportedError("SMTP server does not advertise STARTTLS")
@@ -322,11 +311,6 @@ def send_critical_email(printer_name, ip_address, error_text):
                         printer_name, starttls_code, format_smtp_response(starttls_response),
                     )
                     ehlo_code, ehlo_response = server.ehlo()
-                    logger.debug(
-                        "SMTP post-STARTTLS EHLO completed for %s with code=%s response=%s does_esmtp=%s features=%s",
-                        printer_name, ehlo_code, format_smtp_response(ehlo_response),
-                        server.does_esmtp, server.esmtp_features,
-                    )
             server.send_message(msg, from_addr=SENDER_EMAIL, to_addrs=RECIPIENT_EMAILS)
         logger.info("Alert email sent for %s", printer_name)
     except smtplib.SMTPSenderRefused as exc:
@@ -341,16 +325,14 @@ def send_critical_email(printer_name, ip_address, error_text):
 
 def get_printer_alerts(ip, community):
     alert_oid = "1.3.6.1.2.1.43.18.1.1.8"
-    
     raw_alerts = run_snmp_command(ip, community, alert_oid, "2c", "snmpwalk")
     if not raw_alerts:
         raw_alerts = run_snmp_command(ip, community, alert_oid, "1", "snmpwalk")
-        
     if not raw_alerts:
         return {"text": "", "is_critical": False, "is_warning": False}
 
     ignore_list = ["ready", "sleep mode", "power save", "ok", "printing", "warming up", "sleep mode on"]
-    critical_keywords = ["jam", "dead", "depleted", "exhausted", "service", "offline", "install", "failure", "41.", "49.", "50.", "59."] 
+    critical_keywords = ["jam", "dead", "depleted", "exhausted", "service", "offline", "install", "failure", "41.", "49.", "50.", "59."]
     warning_keywords = ["low", "very low", "used supply", "open", "empty", "load", "paused", "cleaning", "tray", "error"]
 
     valid_alerts_found = []
@@ -360,9 +342,9 @@ def get_printer_alerts(ip, community):
             is_ignored = any(ignored_item in alert_text.lower() for ignored_item in ignore_list)
             if alert_text and not is_ignored:
                 valid_alerts_found.append(alert_text)
-                
+
     valid_alerts_found = list(dict.fromkeys(valid_alerts_found))
-    
+
     is_critical = False
     is_warning = False
 
@@ -373,33 +355,32 @@ def get_printer_alerts(ip, community):
         safe_text = safe_text.replace("copy services", "copy ops")
         safe_text = safe_text.replace("device services", "device ops")
         safe_text = safe_text.replace("print and copy services", "print ops")
-        
+
         is_current_critical = False
         for kw in critical_keywords:
             if kw in safe_text:
                 is_current_critical = True
                 is_critical = True
                 break
-        
         if not is_current_critical:
             for kw in warning_keywords:
                 if kw in safe_text:
                     is_warning = True
                     break
 
-    final_text = " | ".join(valid_alerts_found)
-    return {"text": final_text, "is_critical": is_critical, "is_warning": is_warning}
+    return {"text": " | ".join(valid_alerts_found), "is_critical": is_critical, "is_warning": is_warning}
 
 
 # =========================
-# INVENTORY MATH LOGIC
+# INVENTORY LOGIC
 # =========================
 def load_inventory():
     if os.path.exists(INVENTORY_FILE):
         try:
             with open(INVENTORY_FILE, "r") as f:
                 return json.load(f)
-        except Exception: pass
+        except Exception:
+            pass
     inv = {}
     for model in PART_NUMBERS:
         inv[model] = {"Black": 0, "Cyan": 0, "Magenta": 0, "Yellow": 0}
@@ -411,22 +392,48 @@ def save_inventory(inv):
     with open(INVENTORY_FILE, "w") as f:
         json.dump(inv, f, indent=4)
 
-def is_swap(prev_val, curr_val):
-    if curr_val == "-" or prev_val == "-": return False
-    try:
-        c = int(curr_val)
-        p = int(prev_val) if prev_val not in ["REPLACE", "OK", "?"] else 0
-    except (ValueError, TypeError):
-        return False
-    if c < 0 or p < 0:
-        return False
-    return p <= 15 and c >= 95
+def load_shopping_state():
+    if os.path.exists(SHOPPING_STATE_FILE):
+        try:
+            with open(SHOPPING_STATE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_shopping_state(shopping_counts):
+    ensure_parent_dir(SHOPPING_STATE_FILE)
+    with open(SHOPPING_STATE_FILE, "w") as f:
+        json.dump(shopping_counts, f, indent=4)
+
+def deduct_inventory_from_shopping_change(shopping_counts, prev_shopping, inventory):
+    """
+    For each model/color where the number of printers NEEDING a toner
+    went DOWN compared to last run, deduct that difference from inventory.
+    This reliably catches every toner replacement regardless of how it happened.
+    """
+    for model, counts in shopping_counts.items():
+        if model not in inventory:
+            continue
+        for color in ["Black", "Cyan", "Magenta", "Yellow"]:
+            new_need = counts.get(color, 0)
+            prev_need = prev_shopping.get(model, {}).get(color, new_need)
+            if new_need < prev_need:
+                diff = prev_need - new_need
+                current_stock = inventory[model].get(color, 0)
+                inventory[model][color] = max(0, current_stock - diff)
+                logger.info(
+                    "📦 TONER REPLACED: %s %s need dropped from %s → %s. "
+                    "Deducted %s from inventory (now %s).",
+                    model, color, prev_need, new_need, diff, inventory[model][color],
+                )
+
 
 # =========================
 # HTML GENERATOR
 # =========================
 def generate_html(printer_data, shopping_counts, inventory, timestamp):
-    
+
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -490,15 +497,15 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
             .offline { color: #e74c3c; font-weight: bold; }
             .online { color: #2ecc71; font-weight: bold; }
             .shopping-table th { background-color: var(--shop-th); }
-            .alert-critical { background-color: #ffcccc; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
-            .alert-warning { background-color: #ffe0b2; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block;}
+            .alert-critical { background-color: #ffcccc; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+            .alert-warning { background-color: #ffe0b2; color: black; font-weight: 500; padding: 4px 8px; border-radius: 4px; display: inline-block; }
             .theme-toggle { background: var(--th-bg); color: var(--th-text); border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-            .theme-toggle:hover { background: var(--link-hover); color: #fff;}
-            .progress-container { width: 100%; min-width: 60px; background-color: var(--bar-bg); border-radius: 4px; position: relative; height: 22px; display: flex; align-items: center; overflow: hidden; border: 1px solid rgba(0,0,0,0.1);}
+            .theme-toggle:hover { background: var(--link-hover); color: #fff; }
+            .progress-container { width: 100%; min-width: 60px; background-color: var(--bar-bg); border-radius: 4px; position: relative; height: 22px; display: flex; align-items: center; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); }
             .progress-bar { height: 100%; transition: width 0.5s ease; }
-            .progress-text { position: absolute; width: 100%; text-align: center; font-size: 0.85em; font-weight: 700; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9); pointer-events: none;}
+            .progress-text { position: absolute; width: 100%; text-align: center; font-size: 0.85em; font-weight: 700; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9); pointer-events: none; }
         </style>
-        
+
         <script>
             function resetName() {
                 localStorage.removeItem('orderName');
@@ -512,7 +519,7 @@ def generate_html(printer_data, shopping_counts, inventory, timestamp):
                     if (userName && userName.trim() !== "") {
                         localStorage.setItem('orderName', userName.trim());
                     } else {
-                        userName = "IT Support"; 
+                        userName = "IT Support";
                     }
                 }
                 let subject = "Toner Order - " + serial;
@@ -611,11 +618,11 @@ Westmount, QC H3Z 3C1`;
                 </div>
             </div>
     """
-    
+
     html += f"""
             <div id="live-content">
                 <div class="timestamp">Last Updated: {timestamp}</div>
-                
+
                 <h2>🛒 Shopping List</h2>
                 <table class="shopping-table" id="shopTable">
                     <tr>
@@ -632,19 +639,19 @@ Westmount, QC H3Z 3C1`;
     def get_inv_display(need, have):
         color = "#2ecc71" if have > need else "#f39c12" if have == need else "#e74c3c"
         return f"{need} / <strong><span style='color:{color}'>{have}</span></strong>"
-        
+
     for model in sorted(shopping_counts.keys(), key=lambda x: x.lower()):
         counts = shopping_counts[model]
         inv_counts = inventory.get(model, {})
         model_parts = PART_NUMBERS.get(model, {})
-        
+
         parts_to_order = []
         for item in ["Black", "Cyan", "Magenta", "Yellow"]:
             if counts[item] > 0:
                 parts_to_order.append(f"{item}: {model_parts.get(item, '?')}")
-        
+
         parts_str = "<br>".join(parts_to_order) if parts_to_order else "None needed yet"
-        
+
         if "Galactica" in model:
             order_link = "<a href='#' onclick=\"sendOrderEmail('canon', 'Galactica', '2XK0 2732'); return false;\">📧 Email Canon</a>"
         elif "Orion" in model:
@@ -653,7 +660,7 @@ Westmount, QC H3Z 3C1`;
             order_link = "<a href='#' onclick=\"sendOrderEmail('printersplus', 'Mercury', 'Xerox AltaLink C8145'); return false;\">📧 Email PrintersPlus</a>"
         else:
             order_link = "<a href='https://www.printersplus.net' target='_blank'>🌐 printersplus.net</a>"
-        
+
         html += f"""
                 <tr>
                     <td><strong>{model}</strong></td>
@@ -668,7 +675,7 @@ Westmount, QC H3Z 3C1`;
 
     html += """
                 </table>
-                
+
                 <h2>📊 Live Printer Status</h2>
                 <table id="statusTable">
                     <tr>
@@ -689,15 +696,14 @@ Westmount, QC H3Z 3C1`;
         if val == "?": return "?"
         if isinstance(val, int):
             actual_val = 0 if val == -2 else val
-            if color_type == "black":   bar_color = "var(--toner-black)"
+            if color_type == "black":    bar_color = "var(--toner-black)"
             elif color_type == "cyan":   bar_color = "var(--toner-cyan)"
             elif color_type == "magenta": bar_color = "var(--toner-magenta)"
             elif color_type == "yellow": bar_color = "var(--toner-yellow)"
             else: bar_color = "#95a5a6"
-            width_percent = max(actual_val, 0)
             return (
                 f"<div class='progress-container'>"
-                f"<div class='progress-bar' style='width:{width_percent}%;background-color:{bar_color};'></div>"
+                f"<div class='progress-bar' style='width:{max(actual_val,0)}%;background-color:{bar_color};'></div>"
                 f"<span class='progress-text'>{actual_val}%</span>"
                 f"</div>"
             )
@@ -714,7 +720,7 @@ Westmount, QC H3Z 3C1`;
                 alerts_td_class_attr = "class='alert-critical'"
             elif alerts_data['is_warning']:
                 alerts_td_class_attr = "class='alert-warning'"
-        
+
         html += f"""
                     <tr>
                         <td><strong><a href="http://{p['ip']}" target="_blank">{p['name']}</a></strong></td>
@@ -735,10 +741,11 @@ Westmount, QC H3Z 3C1`;
     </body>
     </html>
     """
-    
+
     ensure_parent_dir(HTML_FILE)
     with open(HTML_FILE, "w", encoding="utf-8") as f:
         f.write(html)
+
 
 # =========================
 # MAIN EXECUTION
@@ -748,18 +755,11 @@ def main():
     ensure_parent_dir(STATE_FILE)
     ensure_parent_dir(HTML_FILE)
     logger.info("Starting dashboard generation using CSV=%s STATE=%s HTML=%s", CSV_FILE, STATE_FILE, HTML_FILE)
-    
+
     shopping_counts = {}
     inventory = load_inventory()
-    
-    toner_state = {}
-    if os.path.exists(TONER_STATE_FILE):
-        try:
-            with open(TONER_STATE_FILE, "r") as f:
-                toner_state = json.load(f)
-        except Exception: pass
-    new_toner_state = {}
-    
+    prev_shopping = load_shopping_state()
+
     alert_state = {}
     if os.path.exists(STATE_FILE):
         try:
@@ -778,7 +778,7 @@ def main():
             ip, name, community = row["IP"], row["name"], row["community"]
             original_model = row.get("model", "Unknown Model")
             logger.debug("Polling printer %s at %s (model=%s)", name, ip, original_model)
-            
+
             shopping_model_name = SUPPLY_MAPPING.get(original_model, original_model)
 
             if shopping_model_name not in shopping_counts:
@@ -787,43 +787,28 @@ def main():
             dev_stat = snmp_get(ip, community, get_oid(original_model, "device_status"))
             online = "YES" if dev_stat else "NO"
             state = map_status(dev_stat)
-            
+
             if online == "NO":
                 alerts_data = {"text": "Printer Offline or Unreachable", "is_critical": True, "is_warning": False}
                 b = c = m = y = "-"
             else:
                 alerts_data = get_printer_alerts(ip, community)
                 model_parts = PART_NUMBERS.get(shopping_model_name, {})
-                
+
                 b = get_supply_percent(ip, community, original_model, "black")
                 c = "-" if model_parts.get("Cyan") == "N/A" else get_supply_percent(ip, community, original_model, "cyan")
                 m = "-" if model_parts.get("Magenta") == "N/A" else get_supply_percent(ip, community, original_model, "magenta")
                 y = "-" if model_parts.get("Yellow") == "N/A" else get_supply_percent(ip, community, original_model, "yellow")
 
-            # Automatic inventory deduction on toner swap
-            if online == "YES":
-                curr_levels = {"Black": b, "Cyan": c, "Magenta": m, "Yellow": y}
-                new_toner_state[name] = curr_levels
-                prev_levels = toner_state.get(name, {})
-                for color_name, curr_val in curr_levels.items():
-                    prev_val = prev_levels.get(color_name, "-")
-                    if is_swap(prev_val, curr_val):
-                        if shopping_model_name in inventory:
-                            current_stock = inventory[shopping_model_name].get(color_name, 0)
-                            inventory[shopping_model_name][color_name] = max(0, current_stock - 1)
-                            logger.info(f"🔄 SWAP DETECTED: {color_name} on {name}. Deducted 1 from inventory.")
-            else:
-                new_toner_state[name] = toner_state.get(name, {})
-
             # Failsafe: flag 0% toners as warnings
-            failsafe_errors = []
-            for color_name, val in [("Black Toner", b), ("Cyan Toner", c), ("Magenta Toner", m), ("Yellow Toner", y)]:
-                if isinstance(val, int) and (val == 0 or val == -2):
-                    failsafe_errors.append(f"{color_name} is empty (0%)")
-            
-            if failsafe_errors:
-                alerts_data['is_warning'] = True
-                alerts_data['text'] = (alerts_data['text'] + " | " if alerts_data['text'] else "") + " | ".join(failsafe_errors)
+            if online == "YES":
+                failsafe_errors = []
+                for color_name, val in [("Black Toner", b), ("Cyan Toner", c), ("Magenta Toner", m), ("Yellow Toner", y)]:
+                    if isinstance(val, int) and (val == 0 or val == -2):
+                        failsafe_errors.append(f"{color_name} is empty (0%)")
+                if failsafe_errors:
+                    alerts_data['is_warning'] = True
+                    alerts_data['text'] = (alerts_data['text'] + " | " if alerts_data['text'] else "") + " | ".join(failsafe_errors)
 
             if alerts_data['is_critical']:
                 current_broken_printers.append(name)
@@ -852,18 +837,25 @@ def main():
             )
         logger.info("Completed printer polling loop for %s printers", len(printer_data))
 
+    # Deduct inventory based on shopping need going down
+    if prev_shopping:
+        deduct_inventory_from_shopping_change(shopping_counts, prev_shopping, inventory)
+    else:
+        logger.info("No previous shopping state found — skipping inventory deduction this cycle.")
+
+    # Save shopping state for next run's comparison
+    save_shopping_state(shopping_counts)
+
     printers_to_remove = [p for p in alert_state if p not in current_broken_printers]
     for p in printers_to_remove:
         del alert_state[p]
     if printers_to_remove:
         logger.info("Cleared %s resolved printer alerts from state", len(printers_to_remove))
-        
+
     with open(STATE_FILE, "w") as f:
         json.dump(alert_state, f)
-    
+
     save_inventory(inventory)
-    with open(TONER_STATE_FILE, "w") as f:
-        json.dump(new_toner_state, f)
 
     printer_data.sort(key=lambda x: x['name'].lower())
     timestamp = format_display_timestamp(get_local_now())
@@ -872,6 +864,7 @@ def main():
         "Dashboard generated successfully at %s with %s printers and %s active critical alerts",
         HTML_FILE, len(printer_data), len(current_broken_printers),
     )
+
 
 if __name__ == "__main__":
     main()
