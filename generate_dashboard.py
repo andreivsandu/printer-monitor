@@ -385,11 +385,11 @@ def format_usage_label(rate):
     if rate is None:
         return "<span style='color:#7f8c8d;font-style:italic;'>Collecting…</span>"
     if rate >= 2.0:
-        return f"<span style='color:#e74c3c;font-weight:bold;'>🔴 Heavy</span><br><small style='color:#7f8c8d'>{rate:.1f}%/day</small>"
+        return f"<span style='color:#e74c3c;font-weight:bold;'>🔴 Heavy</span><br><small style='color:#7f8c8d'>{rate:.2f}%/day</small>"
     elif rate >= 0.4:
-        return f"<span style='color:#f39c12;font-weight:bold;'>🟡 Medium</span><br><small style='color:#7f8c8d'>{rate:.1f}%/day</small>"
+        return f"<span style='color:#f39c12;font-weight:bold;'>🟡 Medium</span><br><small style='color:#7f8c8d'>{rate:.2f}%/day</small>"
     else:
-        return f"<span style='color:#2ecc71;font-weight:bold;'>🟢 Light</span><br><small style='color:#7f8c8d'>{rate:.1f}%/day</small>"
+        return f"<span style='color:#2ecc71;font-weight:bold;'>🟢 Light</span><br><small style='color:#7f8c8d'>{rate:.2f}%/day</small>"
 
 
 # =========================
